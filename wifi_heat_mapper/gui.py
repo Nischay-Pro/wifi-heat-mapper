@@ -1,6 +1,6 @@
 import PySimpleGUI as sg
 import os.path
-from wifi_heat_mapper.misc import run_iperf, processIW, load_json, save_json
+from wifi_heat_mapper.misc import run_iperf, run_speedtest, processIW, load_json, save_json
 from wifi_heat_mapper.graph import generate_graph
 from PIL import Image
 
@@ -150,6 +150,18 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                         results["upload_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
                         results["upload_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
                         results["upload_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
+
+                    if "speedtest" in configuration["modes"]:
+                        speedtest_download = run_speedtest()
+                        results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
+                        results["speedtest_latency"] = speedtest_download["ping"]["latency"]
+                        results["speedtest_download_bandwidth"] = speedtest_download["download"]["bandwidth"]
+                        results["speedtest_download_size"] = speedtest_download["download"]["bytes"]
+                        results["speedtest_download_elapsed_ms"] = speedtest_download["download"]["elapsed"]
+                        results["speedtest_upload_bandwidth"] = speedtest_download["upload"]["bandwidth"]
+                        results["speedtest_upload_size"] = speedtest_download["upload"]["bytes"]
+                        results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
+                        results["speedtest_packet_loss"] = speedtest_download["packetLoss"]
 
                     results["signal_strength"] = iw["signal_strength"]
                     results["signal_quality"] = iw["signal_strength"] + 110

@@ -3,10 +3,9 @@ from wifi_heat_mapper.misc import check_application, get_application_output, pro
 from wifi_heat_mapper.gui import start_gui
 from wifi_heat_mapper.config import start_config
 
-required_applications = ["iw"]
-
 
 def main(target_interface, floor_map, iperf_server, input_file, output_file):
+    required_applications = ["iw"]
     for app in required_applications:
         if not check_application(app):
             print("Could not find required external application: {}!".format(app))

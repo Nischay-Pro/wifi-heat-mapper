@@ -42,8 +42,9 @@ class GraphPlot:
         self.floor_map_dimensions = (xmax, ymax)
 
     def set_min_max(self):
-        if self.vmin is None or self.vmax is None:
+        if self.vmin is None:
             self.vmin = min(self.processed_results["z"])
+        if self.vmax is None:
             self.vmax = max(self.processed_results["z"])
 
     def generate_plot(self):
