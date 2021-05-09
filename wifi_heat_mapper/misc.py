@@ -73,6 +73,10 @@ def run_iperf(ip, port, download=True, protocol="tcp"):
     iperf_result = client.run()
     return iperf_result.json
 
+def run_speedtest():
+    speedtest_result = get_application_output(["speedtest", "-f", "json"])
+    return speedtest_result
+
 def save_json(file_path, data):
     try:
         with open(file_path, "w") as f:

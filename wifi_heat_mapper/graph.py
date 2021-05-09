@@ -6,6 +6,7 @@ from matplotlib.pyplot import imread
 from PIL import Image
 from scipy.interpolate import griddata, Rbf
 from wifi_heat_mapper.config import ConfigurationOptions
+from tqdm import tqdm
 
 class GraphPlot:
     def __init__(self, results, key, floor_map, vmin = None, vmax = None):
@@ -69,17 +70,16 @@ class GraphPlot:
         plt.title("{}".format(ConfigurationOptions.configuration[self.key]["description"]))
         plt.axis('off')
         plt.legend(bbox_to_anchor=(0.3, -0.02))
-        plt.show()
+        file_name = "{}.png".format(self.key)
+        plt.savefig(file_name, dpi=300)
+        # plt.show()
         
 
 def generate_graph(data, floor_map):
     benchmark_results = data["results"]
     configuration = data["configuration"]
     graph_modes = ConfigurationOptions.configuration
-    graph_keys = tuple(graph_modes)
-    for graph_item in configuration["graphs"]:
-        index = graph_item - 1
-        key_name = graph_keys[index]
+    for key_name in tqdm(configuration["graphs"], desc="Generating Plots"):
         vmin = None
         vmax = None
         if "vmin" in graph_modes[key_name]:
@@ -87,7 +87,4 @@ def generate_graph(data, floor_map):
         if "vmax" in graph_modes[key_name]:
             vmax = graph_modes[key_name]["vmax"]
         GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax).generate_plot()
-    
-    # if benchmarks_done == 0:
-    #     print("No benchmarks were performed. Please try benchmarking again!")
-    #     exit(1)
+    print("Finished plotting")

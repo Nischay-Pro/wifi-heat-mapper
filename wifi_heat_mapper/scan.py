@@ -46,6 +46,7 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
         configuration = start_config()
 
     print("Loading floor map")
+    configuration["target_interface"] = target_interface
     start_gui(target_interface, floor_map, iperf_ip, iperf_port, iw_results["ssid"], input_file, output_file, configuration)
 
 def driver():

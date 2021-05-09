@@ -1,4 +1,4 @@
-from wifi_heat_mapper.misc import TColor
+from wifi_heat_mapper.misc import TColor, check_application
 from collections import OrderedDict
 
 class ConfigurationOptions:
@@ -29,14 +29,6 @@ class ConfigurationOptions:
             "description": "Wi-Fi Download [TCP] (in bytes)",
             "requirements": ["tcp_r"],
         }
-    configuration["download_bits_udp"] = {
-            "description": "Wi-Fi Download [UDP] (in bits)",
-            "requirements": ["udp_r"],
-        }
-    configuration["download_bytes_udp"] = {
-            "description": "Wi-Fi Download [UDP] (in bytes)",
-            "requirements": ["udp_r"],
-        }
     configuration["upload_bits_tcp"] = {
             "description": "Wi-Fi Upload [TCP] (in bits)",
             "requirements": ["tcp"],
@@ -44,6 +36,14 @@ class ConfigurationOptions:
     configuration["upload_bytes_tcp"] = {
             "description": "Wi-Fi Upload [TCP] (in bytes)",
             "requirements": ["tcp"],
+        }
+    configuration["download_bits_udp"] = {
+            "description": "Wi-Fi Download [UDP] (in bits)",
+            "requirements": ["udp_r"],
+        }
+    configuration["download_bytes_udp"] = {
+            "description": "Wi-Fi Download [UDP] (in bytes)",
+            "requirements": ["udp_r"],
         }
     configuration["upload_bits_udp"] = {
             "description": "Wi-Fi Upload [UDP] (in bits)",
@@ -63,6 +63,16 @@ class ConfigurationOptions:
         }
 
 def start_config():
+    modes = []
+    if check_application("iperf3"):
+        modes.append("iperf3")
+    if check_application("speedtest"):
+        modes.append("speedtest")
+
+    if len(modes) == 0:
+        print("Could not detect any supported mode [iperf3 or speedtest].")
+        exit(1)
+    
     print("Supported Graphs:")
     configuration_dict = ConfigurationOptions.configuration
     for idx, itm in enumerate(configuration_dict.keys()):
@@ -70,10 +80,14 @@ def start_config():
     print("{}{}{}".format(TColor.UNDERLINE, "=>> Select graphs to plot. eg: 1 2 3 5 6 or simply type 'all'", TColor.RESET))
     response = input("> ")
     selection = []
+    graph_key = []
+
     if response == "all":
         for itm in configuration_dict.keys():
             selection += configuration_dict[itm]["requirements"]
         keys = tuple(range(1, len(configuration_dict.keys()) + 1))
+        graph_key = tuple(configuration_dict.keys())
+
     elif len(response) > 0:
         keys = []
         if response.isdecimal():
@@ -97,12 +111,13 @@ def start_config():
         for key in keys:
             configuration_dict_key = list(configuration_dict)[key - 1]
             selection += configuration_dict[configuration_dict_key]["requirements"]
+            graph_key.append(configuration_dict_key)
+
     else:
         print("No option was selected.")
         exit(1)
     selection = tuple(set(selection))
-    return {"graphs": keys, "modes": selection}
-
+    return {"graphs": graph_key, "modes": selection}
 
 def print_graph_to_console(index, title, description):
     print("  {}{}{} {}{}{}".format(TColor.GREEN, index, TColor.RESET, TColor.MAGENTA, title, TColor.RESET))
