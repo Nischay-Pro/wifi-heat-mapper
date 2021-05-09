@@ -4,6 +4,7 @@ from wifi_heat_mapper.misc import run_iperf, processIW, load_json, save_json
 from wifi_heat_mapper.graph import generate_graph
 from PIL import Image
 
+
 def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_file, output_file, configuration):
 
     right_click_items = ["Items", ["&Benchmark", "&Delete", "&Mark/Un-Mark as Station"]]
@@ -12,20 +13,18 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
     canvas_size = (im.size[0], im.size[1])
     output_path_index = sg.InputText(visible=False, enable_events=True, key='output_path')
     layout = [
-        [
-        sg.Graph(
+        [sg.Graph(
             canvas_size=canvas_size,
             graph_bottom_left=(0, 0),
             graph_top_right=canvas_size,
             key="Floor Map",
             enable_events=True,
             background_color="DodgerBlue",
-            right_click_menu=right_click_items
-        )
-        ],
-        [sg.Button("Exit"), output_path_index, sg.FileSaveAs(button_text="Save Results", file_types = (('JSON file', '*.json'),), default_extension = "json", key="FileName"), sg.Button("Plot"), sg.Button("Clear All")]
+            right_click_menu=right_click_items)],
+        [sg.Button("Exit"), output_path_index, sg.FileSaveAs(button_text="Save Results",
+         file_types=(('JSON file', '*.json'),), default_extension="json", key="FileName"),
+         sg.Button("Plot"), sg.Button("Clear All")]
     ]
-    # , sg.Text("Nothing to benchmark", key="Status")
 
     window = sg.Window("Wi-Fi heat mapper", layout, finalize=True)
 
@@ -33,16 +32,18 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
     graph.DrawImage(filename=floor_map, location=(0, canvas_size[1]))
 
     benchmark_points = {}
-    
-    if input_file != None and os.path.isfile(input_file):
+
+    if input_file is not None and os.path.isfile(input_file):
         data = load_json(input_file)
-        if data != False:
+        if data is not False:
             configuration = data["configuration"]
             benchmark_points = data["results"]
             benchmark_points, current_selection = replot(graph, benchmark_points)
             if configuration["ssid"] != ssid:
-                print("Configuration file is for {} but user connected to {}".format(configuration["ssid"], ssid))
-                print("Please connect to {} and try benchmarking again.".format(configuration["ssid"]))
+                print("Configuration file is for {} but user connected to {}"
+                      .format(configuration["ssid"], ssid))
+                print("Please connect to {} and try benchmarking again."
+                      .format(configuration["ssid"]))
                 exit(1)
 
     current_selection = None
@@ -70,7 +71,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 if contains(mouse, pt_bench):
                     pt_exists = True
                     benchmark_points[itm]["selected"] = True
-                    if current_selection == None:
+                    if current_selection is None:
                         current_selection = itm
                     else:
                         benchmark_points[current_selection]["selected"] = False
@@ -78,7 +79,8 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                     break
 
             if not pt_exists:
-                index = graph.draw_circle(mouse, 7, fill_color = "gray", line_color = "blue", line_width = 3)
+                index = graph.draw_circle(mouse, 7, fill_color="gray", line_color="blue",
+                                          line_width=3)
                 benchmark_points[index] = {
                     "position": {
                         "x": mouse[0],
@@ -89,23 +91,23 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                     "station": False,
                     "results": None
                 }
-                if current_selection != None:
+                if current_selection is not None:
                     benchmark_points[current_selection]["selected"] = False
                     current_selection = index
                 else:
                     current_selection = index
 
         benchmark_points, current_selection = replot(graph, benchmark_points)
-                
+
         if event == "Delete":
-            if current_selection != None:
+            if current_selection is not None:
                 graph.delete_figure(current_selection)
                 benchmark_points.pop(current_selection)
                 current_selection = None
                 # benchmark_points, current_selection = replot(graph, benchmark_points)
 
         if event == "Benchmark":
-            if current_selection != None:
+            if current_selection is not None:
                 # window["Status"].update("Benchmarking!")
 
                 iw = processIW(target_interface)
@@ -165,7 +167,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 sg.popup_error("Please select a benchmark point.")
 
         if event == "Mark/Un-Mark as Station":
-            if current_selection != None:
+            if current_selection is not None:
                 if benchmark_points[current_selection]["station"]:
                     benchmark_points[current_selection]["station"] = False
                 else:
@@ -199,16 +201,15 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                     else:
                         print("Unable to save to disk")
                         sg.popup_error("Unable to save to disk!")
-                
-        
+
         if event == "Plot":
             if len(benchmark_points.keys()) >= 4:
                 post_process = True
                 print("Exporting Results")
                 break
             else:
-                sg.popup_error("Not enough benchmark points! Try benchmarking {} more.".format(4 - len(benchmark_points.keys())))
-            
+                sg.popup_error("Not enough benchmark points! Try benchmarking {} more."
+                               .format(4 - len(benchmark_points.keys())))
 
         if event == "Clear All":
             benchmark_points, current_selection = replot(graph, benchmark_points, clear=True)
@@ -217,16 +218,19 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
 
     if post_process:
         data = {
-                    "configuration": configuration,
-                    "results": benchmark_points
+            "configuration": configuration,
+            "results": benchmark_points
         }
         generate_graph(data, floor_map)
 
+
 def contains(pt1, pt2):
-    return ((pt1[0] - pt2[0]) ** 2  + (pt1[1] - pt2[1]) ** 2) <= 7 ** 2
+    return ((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2) <= 7 ** 2
+
 
 def get_point(data, index):
     return (data[index]["position"]["x"], data[index]["position"]["y"])
+
 
 def replot(graph, benchmark_points, clear=False):
     new_benchmark_point = {}
@@ -239,11 +243,13 @@ def replot(graph, benchmark_points, clear=False):
                 line_color = "red"
             if benchmark_points[itm]["selected"]:
                 line_color = "blue"
-            pt = graph.draw_circle(get_point(benchmark_points, itm), 7, fill_color = benchmark_points[itm]["fill_color"], line_color = line_color, line_width = 3)
+            pt = graph.draw_circle(get_point(benchmark_points, itm), 7, fill_color=benchmark_points[itm]["fill_color"],
+                                   line_color=line_color, line_width=3)
             if benchmark_points[itm]["selected"]:
                 new_selection = pt
             new_benchmark_point[pt] = benchmark_points[itm]
     return (new_benchmark_point, new_selection)
+
 
 def de_select(benchmark_points):
     for itm in benchmark_points.keys():

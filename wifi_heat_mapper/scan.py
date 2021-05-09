@@ -1,11 +1,10 @@
-import iwlib
 import argparse
-import os
 from wifi_heat_mapper.misc import check_application, get_application_output, processIW, verify_iperf
 from wifi_heat_mapper.gui import start_gui
 from wifi_heat_mapper.config import start_config
 
 required_applications = ["iw"]
+
 
 def main(target_interface, floor_map, iperf_server, input_file, output_file):
     for app in required_applications:
@@ -13,7 +12,8 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
             print("Could not find required external application: {}!".format(app))
             exit(1)
 
-    check_interface = get_application_output(["cat /sys/class/net/{}/operstate".format(target_interface)], shell=True, timeout=10)
+    cmd = "cat /sys/class/net/{}/operstate".format(target_interface)
+    check_interface = get_application_output(cmd, shell=True, timeout=10)
     if check_interface == "invalid":
         print("Interface {} does not exist!".format(target_interface))
         exit(1)
@@ -25,7 +25,7 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
     if check_interface != "up":
         print("Interface {} is not ready.".format(target_interface))
         exit(1)
-    
+
     iw_results = processIW(target_interface)
 
     print("Running benchmark for SSID: {}".format(iw_results["ssid"]))
@@ -36,18 +36,19 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
     else:
         iperf_ip = iperf_server
         iperf_port = 5201
-    
+
     if not verify_iperf(iperf_ip, iperf_port):
         print("Could not connect to iperf3 server.")
         exit(1)
 
     configuration = None
-    if input_file == None:
+    if input_file is None:
         configuration = start_config()
 
     print("Loading floor map")
-    configuration["target_interface"] = target_interface
-    start_gui(target_interface, floor_map, iperf_ip, iperf_port, iw_results["ssid"], input_file, output_file, configuration)
+    start_gui(target_interface, floor_map, iperf_ip, iperf_port, iw_results["ssid"], input_file,
+              output_file, configuration)
+
 
 def driver():
     parser = argparse.ArgumentParser(

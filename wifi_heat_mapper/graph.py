@@ -1,15 +1,14 @@
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
 from matplotlib.pyplot import imread
-from PIL import Image
-from scipy.interpolate import griddata, Rbf
+from scipy.interpolate import Rbf
 from wifi_heat_mapper.config import ConfigurationOptions
 from tqdm import tqdm
 
+
 class GraphPlot:
-    def __init__(self, results, key, floor_map, vmin = None, vmax = None):
+    def __init__(self, results, key, floor_map, vmin=None, vmax=None):
         self.results = results
         self.floor_map = floor_map
         self.vmin = vmin
@@ -19,7 +18,7 @@ class GraphPlot:
         self.floor_map_dimensions = None
 
     def process_result(self):
-        processed_results = { "x": [], "y": [], "z": [] , "sx": [], "sy": []}
+        processed_results = {"x": [], "y": [], "z": [], "sx": [], "sy": []}
         for result in self.results.keys():
             processed_results["x"].append(self.results[result]["position"]["x"])
             processed_results["y"].append(self.results[result]["position"]["y"])
@@ -30,8 +29,10 @@ class GraphPlot:
         self.processed_results = processed_results
 
     def add_zero_boundary(self):
-        self.processed_results["x"] += [0, 0, self.floor_map_dimensions[0], self.floor_map_dimensions[0]]
-        self.processed_results["y"] += [0, self.floor_map_dimensions[1], self.floor_map_dimensions[1], 0]
+        self.processed_results["x"] += [0, 0, self.floor_map_dimensions[0],
+                                        self.floor_map_dimensions[0]]
+        self.processed_results["y"] += [0, self.floor_map_dimensions[1],
+                                        self.floor_map_dimensions[1], 0]
         self.set_min_max()
         self.processed_results["z"] += [self.vmin] * 4
 
@@ -41,15 +42,15 @@ class GraphPlot:
         self.floor_map_dimensions = (xmax, ymax)
 
     def set_min_max(self):
-        if self.vmin == None or self.vmax == None:
+        if self.vmin is None or self.vmax is None:
             self.vmin = min(self.processed_results["z"])
             self.vmax = max(self.processed_results["z"])
-        
+
     def generate_plot(self):
         self.process_result()
         self.set_floor_map_dimensions()
         self.add_zero_boundary()
-        
+
         minimum = 0
         maximum = max(self.floor_map_dimensions)
 
@@ -57,23 +58,33 @@ class GraphPlot:
         yi = np.linspace(minimum, maximum, 100)
 
         xi, yi = np.meshgrid(xi, yi)
-        di = Rbf(self.processed_results["x"], self.processed_results["y"], self.processed_results["z"], function="linear")
+        di = Rbf(self.processed_results["x"], self.processed_results["y"],
+                 self.processed_results["z"], function="linear")
         zi = di(xi, yi)
 
+        fig, ax = plt.subplots(1, 1)
 
-        fig, ax=plt.subplots(1,1)
-        bench_plot = ax.contourf(xi, yi, zi, cmap="RdYlBu_r", vmin=self.vmin, vmax=self.vmax, alpha=0.5, zorder=150, antialiased=True)
-        ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o', markeredgecolor='black', markeredgewidth=1, linestyle='None', markersize=10, label="Benchmark Point")
-        ax.plot(self.processed_results["sx"], self.processed_results["sy"], zorder=250, marker='o', markeredgecolor='black', markerfacecolor="orange", markeredgewidth=1, linestyle='None', markersize=10, label="Base Station")
-        ax.imshow(imread(self.floor_map)[::-1], interpolation='bicubic', zorder=1, alpha=1, origin="lower")
+        bench_plot = ax.contourf(xi, yi, zi, cmap="RdYlBu_r", vmin=self.vmin, vmax=self.vmax,
+                                 alpha=0.5, zorder=150, antialiased=True)
+
+        ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o',
+                markeredgecolor='black', markeredgewidth=1, linestyle='None', markersize=10,
+                label="Benchmark Point")
+
+        ax.plot(self.processed_results["sx"], self.processed_results["sy"], zorder=250, marker='o',
+                markeredgecolor='black', markerfacecolor="orange", markeredgewidth=1,
+                linestyle='None', markersize=10, label="Base Station")
+
+        ax.imshow(imread(self.floor_map)[::-1], interpolation='bicubic', zorder=1, alpha=1,
+                  origin="lower")
+
         fig.colorbar(bench_plot)
         plt.title("{}".format(ConfigurationOptions.configuration[self.key]["description"]))
         plt.axis('off')
         plt.legend(bbox_to_anchor=(0.3, -0.02))
         file_name = "{}.png".format(self.key)
         plt.savefig(file_name, dpi=300)
-        # plt.show()
-        
+
 
 def generate_graph(data, floor_map):
     benchmark_results = data["results"]
