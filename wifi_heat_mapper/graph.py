@@ -63,6 +63,8 @@ class GraphPlot:
         di = Rbf(self.processed_results["x"], self.processed_results["y"],
                  self.processed_results["z"], function="linear")
         zi = di(xi, yi)
+        zi[zi < self.vmin] = self.vmin
+        zi[zi > self.vmax] = self.vmax
 
         fig, ax = plt.subplots(1, 1)
 
@@ -70,12 +72,12 @@ class GraphPlot:
                                  alpha=0.5, zorder=150, antialiased=True)
 
         ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o',
-                markeredgecolor='black', markeredgewidth=1, linestyle='None', markersize=10,
+                markeredgecolor='black', markeredgewidth=0.5, linestyle='None', markersize=5,
                 label="Benchmark Point")
 
         ax.plot(self.processed_results["sx"], self.processed_results["sy"], zorder=250, marker='o',
-                markeredgecolor='black', markerfacecolor="orange", markeredgewidth=1,
-                linestyle='None', markersize=10, label="Base Station")
+                markeredgecolor='black', markerfacecolor="orange", markeredgewidth=0.5,
+                linestyle='None', markersize=5, label="Base Station")
 
         ax.imshow(imread(self.floor_map)[::-1], interpolation='bicubic', zorder=1, alpha=1,
                   origin="lower")

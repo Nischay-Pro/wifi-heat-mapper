@@ -85,7 +85,7 @@ def run_iperf(ip, port, download=True, protocol="tcp"):
 
 
 def run_speedtest():
-    speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"]))
+    speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"], timeout=120))
     return speedtest_result
 
 

@@ -121,11 +121,9 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 graph.delete_figure(current_selection)
                 benchmark_points.pop(current_selection)
                 current_selection = None
-                # benchmark_points, current_selection = replot(graph, benchmark_points)
 
         if event == "Benchmark":
             if current_selection is not None:
-                # window["Status"].update("Benchmarking!")
 
                 iw = processIW(target_interface)
                 if iw["ssid"] != ssid:

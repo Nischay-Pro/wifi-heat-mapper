@@ -29,41 +29,49 @@ class ConfigurationOptions:
         "description": "Wi-Fi Download [TCP] (in bits/s)",
         "requirements": ["tcp_r"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["download_bytes_tcp"] = {
         "description": "Wi-Fi Download [TCP] (in bytes/s)",
         "requirements": ["tcp_r"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["upload_bits_tcp"] = {
         "description": "Wi-Fi Upload [TCP] (in bits/s)",
         "requirements": ["tcp"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["upload_bytes_tcp"] = {
         "description": "Wi-Fi Upload [TCP] (in bytes/s)",
         "requirements": ["tcp"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["download_bits_udp"] = {
         "description": "Wi-Fi Download [UDP] (in bits/s)",
         "requirements": ["udp_r"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["download_bytes_udp"] = {
         "description": "Wi-Fi Download [UDP] (in bytes/s)",
         "requirements": ["udp_r"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["upload_bits_udp"] = {
         "description": "Wi-Fi Upload [UDP] (in bits/s)",
         "requirements": ["udp"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["upload_bytes_udp"] = {
         "description": "Wi-Fi Upload [UDP] (in bytes/s)",
         "requirements": ["udp"],
         "mode": "iperf3",
+        "vmin": 0,
     }
     configuration["download_jitter_udp"] = {
         "description": "Wi-Fi Download Jitter (in ms)",
@@ -89,11 +97,13 @@ class ConfigurationOptions:
         "description": "Speedtest Wi-Fi Download [TCP] (in bytes/s)",
         "requirements": ["speedtest"],
         "mode": "speedtest",
+        "vmin": 0,
     }
     configuration["speedtest_upload_bandwidth"] = {
         "description": "Speedtest Wi-Fi Upload [TCP] (in bytes/s)",
         "requirements": ["speedtest"],
         "mode": "speedtest",
+        "vmin": 0,
     }
 
 
@@ -119,8 +129,8 @@ def start_config():
             print_graph_to_console(i, itm, configuration_dict[itm]["description"])
             i += 1
 
-    print("{}{}{}".format(TColor.UNDERLINE, "=>> Select graphs to plot. eg: 1 2 3 5 6 or simply "
-                          "type 'all'", TColor.RESET))
+    print("{}{}{}".format(TColor.UNDERLINE, "=>> Select graphs to plot. eg: 1 2 3 5 6 or simply type 'all'",
+                          TColor.RESET))
     response = input("> ")
     selection = []
     graph_key = []
