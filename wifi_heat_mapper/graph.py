@@ -20,12 +20,13 @@ class GraphPlot:
     def process_result(self):
         processed_results = {"x": [], "y": [], "z": [], "sx": [], "sy": []}
         for result in self.results.keys():
-            processed_results["x"].append(self.results[result]["position"]["x"])
-            processed_results["y"].append(self.results[result]["position"]["y"])
-            processed_results["z"].append(self.results[result]["results"][self.key])
-            if self.results[result]["station"]:
-                processed_results["sx"].append(self.results[result]["position"]["x"])
-                processed_results["sy"].append(self.results[result]["position"]["y"])
+            if self.results[result]["results"] is not None:
+                processed_results["x"].append(self.results[result]["position"]["x"])
+                processed_results["y"].append(self.results[result]["position"]["y"])
+                processed_results["z"].append(self.results[result]["results"][self.key])
+                if self.results[result]["station"]:
+                    processed_results["sx"].append(self.results[result]["position"]["x"])
+                    processed_results["sy"].append(self.results[result]["position"]["y"])
         self.processed_results = processed_results
 
     def add_zero_boundary(self):

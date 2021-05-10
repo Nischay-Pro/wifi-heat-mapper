@@ -236,7 +236,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 sg.popup_error("Unable to save to disk!")
 
         if event == "Plot":
-            if len(benchmark_points.keys()) >= 4:
+            if processed_results(benchmark_points) >= 4:
                 post_process = True
                 print("Exporting Results")
                 break
@@ -288,6 +288,14 @@ def de_select(benchmark_points):
     for itm in benchmark_points.keys():
         benchmark_points[itm]["selected"] = False
     return benchmark_points
+
+
+def processed_results(benchmark_points):
+    results = 0
+    for itm in benchmark_points.keys():
+        if benchmark_points[itm]["results"] is not None:
+            results += 1
+    return results
 
 
 def get_img_data(f, maxsize=(1200, 850), first=False):
