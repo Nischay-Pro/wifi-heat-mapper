@@ -108,6 +108,8 @@ def start_config():
         print("Could not detect any supported mode [iperf3 or speedtest].")
         exit(1)
 
+    print("Supported Modes: {}{}{}".format(TColor.BLUE, " ".join(map(str, supported_modes)), TColor.RESET))
+
     print("Supported Graphs:")
     configuration_dict = ConfigurationOptions.configuration
     i = 1
