@@ -95,11 +95,6 @@ class ConfigurationOptions:
         "requirements": ["speedtest"],
         "mode": "speedtest",
     }
-    configuration["speedtest_packet_loss"] = {
-        "description": "Speedtest Wi-Fi Packet Loss",
-        "requirements": ["speedtest"],
-        "mode": "speedtest",
-    }
 
 
 def start_config():
@@ -163,7 +158,7 @@ def start_config():
         print("No option was selected.")
         exit(1)
     selection = tuple(set(selection))
-    return {"graphs": graph_key, "modes": selection}
+    return {"graphs": graph_key, "modes": selection, "backends": supported_modes}
 
 
 def print_graph_to_console(index, title, description):

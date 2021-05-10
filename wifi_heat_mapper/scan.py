@@ -1,5 +1,5 @@
 import argparse
-from wifi_heat_mapper.misc import check_application, get_application_output, processIW, verify_iperf
+from wifi_heat_mapper.misc import check_application, get_application_output, processIW
 from wifi_heat_mapper.gui import start_gui
 from wifi_heat_mapper.config import start_config
 
@@ -35,10 +35,6 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
     else:
         iperf_ip = iperf_server
         iperf_port = 5201
-
-    if not verify_iperf(iperf_ip, iperf_port):
-        print("Could not connect to iperf3 server.")
-        exit(1)
 
     configuration = None
     if input_file is None:

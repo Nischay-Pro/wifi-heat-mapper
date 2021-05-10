@@ -1,8 +1,9 @@
 import PySimpleGUI as sg
 import os.path
-from wifi_heat_mapper.misc import run_iperf, run_speedtest, processIW, load_json, save_json
+from wifi_heat_mapper.misc import run_iperf, run_speedtest, processIW, load_json, save_json, verify_iperf
 from wifi_heat_mapper.graph import generate_graph
-from PIL import Image
+from PIL import Image, ImageTk
+import io
 
 
 def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_file, output_file, configuration):
@@ -11,6 +12,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
 
     im = Image.open(floor_map)
     canvas_size = (im.size[0], im.size[1])
+
     output_path_index = sg.InputText(visible=False, enable_events=True, key='output_path')
     layout = [
         [sg.Graph(
@@ -29,7 +31,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
     window = sg.Window("Wi-Fi heat mapper", layout, finalize=True)
 
     graph = window.Element("Floor Map")
-    graph.DrawImage(filename=floor_map, location=(0, canvas_size[1]))
+    graph.DrawImage(data=get_img_data(floor_map, first=True), location=(0, canvas_size[1]))
 
     benchmark_points = {}
 
@@ -45,6 +47,11 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 print("Please connect to {} and try benchmarking again."
                       .format(configuration["ssid"]))
                 exit(1)
+
+    if "iperf3" in configuration["backends"] and not verify_iperf(iperf_ip, iperf_port):
+        print("Could not connect to iperf3 server.")
+        sg.popup_error("Could not connect to iperf3 server.")
+        exit(1)
 
     current_selection = None
 
@@ -115,65 +122,69 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                     sg.popup_error("SSID mismatch!")
                     print("SSID mismatch!")
                 else:
-                    print("Running benchmark")
-                    results = {}
-                    if "tcp_r" in configuration["modes"]:
-                        iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="tcp")
-                        results["download_bits_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"]
-                        results["download_bytes_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"] / 8
-                        results["download_bytes_data_tcp"] = iperf_download["end"]["sum_received"]["bytes"]
-                        results["download_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
+                    try:
+                        print("Running benchmark")
+                        results = {}
 
-                    if "tcp" in configuration["modes"]:
-                        iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="tcp")
-                        results["upload_bits_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"]
-                        results["upload_bytes_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
-                        results["upload_bytes_data_tcp"] = iperf_download["end"]["sum_sent"]["bytes"]
-                        results["upload_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
+                        if "tcp_r" in configuration["modes"]:
+                            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="tcp")
+                            results["download_bits_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"]
+                            results["download_bytes_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"] / 8
+                            results["download_bytes_data_tcp"] = iperf_download["end"]["sum_received"]["bytes"]
+                            results["download_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
 
-                    if "udp_r" in configuration["modes"]:
-                        iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="udp")
-                        results["download_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
-                        results["download_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
-                        results["download_bytes_data_udp"] = iperf_download["end"]["sum"]["bytes"]
-                        results["download_time_udp"] = iperf_download["start"]["test_start"]["duration"]
-                        results["download_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
-                        results["download_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
-                        results["download_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
+                        if "tcp" in configuration["modes"]:
+                            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="tcp")
+                            results["upload_bits_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"]
+                            results["upload_bytes_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
+                            results["upload_bytes_data_tcp"] = iperf_download["end"]["sum_sent"]["bytes"]
+                            results["upload_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
 
-                    if "udp" in configuration["modes"]:
-                        iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="udp")
-                        results["upload_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
-                        results["upload_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
-                        results["upload_bytes_data_udp"] = iperf_download["end"]["sum"]["bytes"]
-                        results["upload_time_udp"] = iperf_download["start"]["test_start"]["duration"]
-                        results["upload_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
-                        results["upload_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
-                        results["upload_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
+                        if "udp_r" in configuration["modes"]:
+                            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="udp")
+                            results["download_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
+                            results["download_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
+                            results["download_bytes_data_udp"] = iperf_download["end"]["sum"]["bytes"]
+                            results["download_time_udp"] = iperf_download["start"]["test_start"]["duration"]
+                            results["download_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
+                            results["download_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
+                            results["download_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
 
-                    if "speedtest" in configuration["modes"]:
-                        speedtest_download = run_speedtest()
-                        results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
-                        results["speedtest_latency"] = speedtest_download["ping"]["latency"]
-                        results["speedtest_download_bandwidth"] = speedtest_download["download"]["bandwidth"]
-                        results["speedtest_download_size"] = speedtest_download["download"]["bytes"]
-                        results["speedtest_download_elapsed_ms"] = speedtest_download["download"]["elapsed"]
-                        results["speedtest_upload_bandwidth"] = speedtest_download["upload"]["bandwidth"]
-                        results["speedtest_upload_size"] = speedtest_download["upload"]["bytes"]
-                        results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
-                        results["speedtest_packet_loss"] = speedtest_download["packetLoss"]
+                        if "udp" in configuration["modes"]:
+                            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="udp")
+                            results["upload_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
+                            results["upload_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
+                            results["upload_bytes_data_udp"] = iperf_download["end"]["sum"]["bytes"]
+                            results["upload_time_udp"] = iperf_download["start"]["test_start"]["duration"]
+                            results["upload_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
+                            results["upload_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
+                            results["upload_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
 
-                    results["signal_strength"] = iw["signal_strength"]
-                    results["signal_quality"] = iw["signal_strength"] + 110
-                    results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
-                    results["channel"] = iw["channel"]
-                    results["channel_frequency"] = iw["channel_frequency"]
-                    benchmark_points[current_selection]["results"] = results
+                        if "speedtest" in configuration["modes"]:
+                            speedtest_download = run_speedtest()
+                            results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
+                            results["speedtest_latency"] = speedtest_download["ping"]["latency"]
+                            results["speedtest_download_bandwidth"] = speedtest_download["download"]["bandwidth"]
+                            results["speedtest_download_size"] = speedtest_download["download"]["bytes"]
+                            results["speedtest_download_elapsed_ms"] = speedtest_download["download"]["elapsed"]
+                            results["speedtest_upload_bandwidth"] = speedtest_download["upload"]["bandwidth"]
+                            results["speedtest_upload_size"] = speedtest_download["upload"]["bytes"]
+                            results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
 
-                    benchmark_points[current_selection]["fill_color"] = "lightblue"
-                    benchmark_points, current_selection = replot(graph, benchmark_points)
+                        results["signal_strength"] = iw["signal_strength"]
+                        results["signal_quality"] = iw["signal_strength"] + 110
+                        results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
+                        results["channel"] = iw["channel"]
+                        results["channel_frequency"] = iw["channel_frequency"]
+                        benchmark_points[current_selection]["results"] = results
 
-                    print("Completed benchmark.")
+                        benchmark_points[current_selection]["fill_color"] = "lightblue"
+                        benchmark_points, current_selection = replot(graph, benchmark_points)
+
+                        print("Completed benchmark.")
+                    except:
+                        print("Unable to perform benchmark.")
+                        sg.popup_error("Unable to perform benchmark.")
             else:
                 print("Please select a benchmark point.")
                 sg.popup_error("Please select a benchmark point.")
@@ -267,3 +278,16 @@ def de_select(benchmark_points):
     for itm in benchmark_points.keys():
         benchmark_points[itm]["selected"] = False
     return benchmark_points
+
+
+def get_img_data(f, maxsize=(1200, 850), first=False):
+    """Generate image data using PIL
+    """
+    img = Image.open(f)
+    img.thumbnail(maxsize)
+    if first:
+        bio = io.BytesIO()
+        img.save(bio, format="PNG")
+        del img
+        return bio.getvalue()
+    return ImageTk.PhotoImage(img)
