@@ -22,13 +22,23 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
             key="Floor Map",
             enable_events=True,
             background_color="DodgerBlue",
-            right_click_menu=right_click_items)],
-        [sg.Button("Exit"), output_path_index, sg.FileSaveAs(button_text="Save Results",
-         file_types=(('JSON file', '*.json'),), default_extension="json", key="FileName"),
-         sg.Button("Plot"), sg.Button("Clear All")]
+            right_click_menu=right_click_items)]
     ]
 
+    if not output_file:
+        layout.append(
+            [sg.Button("Exit"), output_path_index, sg.FileSaveAs(button_text="Save Results",
+             file_types=(('JSON file', '*.json'),), default_extension="json", key="FileName"),
+             sg.Button("Plot"), sg.Button("Clear All")])
+    else:
+        layout.append(
+            [sg.Button("Exit"), output_path_index, sg.Button("Save Results"),
+             sg.Button("Plot"), sg.Button("Clear All")])
+
     window = sg.Window("Wi-Fi heat mapper", layout, finalize=True)
+
+    if output_file:
+        output_path_index.update(output_file)
 
     graph = window.Element("Floor Map")
     graph.DrawImage(data=get_img_data(floor_map, first=True), location=(0, canvas_size[1]))
@@ -198,32 +208,32 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 benchmark_points, current_selection = replot(graph, benchmark_points)
 
         if event == "output_path":
-            if output_file:
+            if values["output_path"]:
                 benchmark_points = de_select(benchmark_points)
                 data = {
                     "configuration": configuration,
                     "results": benchmark_points
                 }
-                if save_json(output_file, data):
+                if save_json(values["output_path"], data):
                     print("Saved to disk")
                     sg.popup_ok("Saved to disk")
+                    output_path_index.update(value="")
                 else:
                     print("Unable to save to disk")
                     sg.popup_error("Unable to save to disk!")
+
+        if event == "Save Results":
+            benchmark_points = de_select(benchmark_points)
+            data = {
+                "configuration": configuration,
+                "results": benchmark_points
+            }
+            if save_json(output_file, data):
+                print("Saved to disk")
+                sg.popup_ok("Saved to disk")
             else:
-                if values["output_path"]:
-                    benchmark_points = de_select(benchmark_points)
-                    data = {
-                        "configuration": configuration,
-                        "results": benchmark_points
-                    }
-                    if save_json(values["output_path"], data):
-                        print("Saved to disk")
-                        sg.popup_ok("Saved to disk")
-                        output_path_index.update(value="")
-                    else:
-                        print("Unable to save to disk")
-                        sg.popup_error("Unable to save to disk!")
+                print("Unable to save to disk")
+                sg.popup_error("Unable to save to disk!")
 
         if event == "Plot":
             if len(benchmark_points.keys()) >= 4:
