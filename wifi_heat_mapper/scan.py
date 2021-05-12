@@ -1,5 +1,5 @@
 import argparse
-from wifi_heat_mapper.misc import check_application, get_application_output, processIW
+from wifi_heat_mapper.misc import check_application, get_application_output, process_iw
 from wifi_heat_mapper.gui import start_gui
 from wifi_heat_mapper.config import start_config
 
@@ -25,7 +25,7 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
         print("Interface {} is not ready.".format(target_interface))
         exit(1)
 
-    iw_results = processIW(target_interface)
+    iw_results = process_iw(target_interface)
 
     print("Running benchmark for SSID: {}".format(iw_results["ssid"]))
 
@@ -38,7 +38,7 @@ def main(target_interface, floor_map, iperf_server, input_file, output_file):
 
     configuration = None
     if input_file is None:
-        configuration = start_config()
+        configuration = start_config(None)
 
     print("Loading floor map")
     start_gui(target_interface, floor_map, iperf_ip, iperf_port, iw_results["ssid"], input_file,

@@ -1,14 +1,53 @@
 import PySimpleGUI as sg
 import os.path
-from wifi_heat_mapper.misc import run_iperf, run_speedtest, processIW, load_json, save_json, verify_iperf
+from wifi_heat_mapper.misc import run_iperf, run_speedtest, process_iw, load_json, save_json, verify_iperf
+from wifi_heat_mapper.misc import get_property_from
 from wifi_heat_mapper.graph import generate_graph
 from PIL import Image, ImageTk
 import io
 
 
-def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_file, output_file, configuration):
+class ConfigurationError(Exception):
+    pass
+
+
+def start_gui(floor_map, iperf_server, config_file, output_file=None):
+
+    if os.path.isfile(config_file):
+        config_file = os.path.abspath(config_file)
+        data = load_json(config_file)
+        if data is not False:
+            configuration = get_property_from(data, "configuration")
+            ssid = get_property_from(configuration, "ssid")
+            target_interface = get_property_from(configuration, "target_interface")
+
+            connected_ssid = process_iw(target_interface)["ssid"]
+            if connected_ssid != ssid:
+                print("Configuration file is for {} but user connected to {}"
+                      .format(ssid, connected_ssid))
+                print("Please connect to {} and try benchmarking again."
+                      .format(ssid))
+                exit(1)
+
+            if output_file is None:
+                output_file = config_file
+
+    else:
+        raise ConfigurationError("Missing configuration file")
+
+    if ":" in iperf_server:
+        iperf_ip = iperf_server.split(":")[0]
+        iperf_port = iperf_server.split(":")[1]
+    else:
+        iperf_ip = iperf_server
+        iperf_port = 5201
+
+    print("Loaded configuration file from: {}".format(config_file))
+    print("Target Interface: {} and SSID: {}".format(target_interface, ssid))
 
     right_click_items = ["Items", ["&Benchmark", "&Delete", "&Mark/Un-Mark as Station"]]
+
+    print("Loading floor map")
 
     im = Image.open(floor_map)
     canvas_size = (im.size[0], im.size[1])
@@ -43,31 +82,22 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
     graph = window.Element("Floor Map")
     graph.DrawImage(data=get_img_data(floor_map, first=True), location=(0, canvas_size[1]))
 
-    benchmark_points = {}
+    print("Loaded floor map")
 
-    if input_file is not None and os.path.isfile(input_file):
-        data = load_json(input_file)
-        if data is not False:
-            configuration = data["configuration"]
-            benchmark_points = data["results"]
-            benchmark_points, current_selection = replot(graph, benchmark_points)
-            if configuration["ssid"] != ssid:
-                print("Configuration file is for {} but user connected to {}"
-                      .format(configuration["ssid"], ssid))
-                print("Please connect to {} and try benchmarking again."
-                      .format(configuration["ssid"]))
-                exit(1)
+    benchmark_points = get_property_from(data, "results")
+
+    current_selection = None
+    benchmark_count = len(benchmark_points.keys())
+    if benchmark_count != 0:
+        print("Restoring previous benchmark points [{}]".format(benchmark_count))
+        benchmark_points, current_selection = replot(graph, benchmark_points)
 
     if "iperf3" in configuration["backends"] and not verify_iperf(iperf_ip, iperf_port):
         print("Could not connect to iperf3 server.")
         sg.popup_error("Could not connect to iperf3 server.")
         exit(1)
 
-    current_selection = None
-
     print("Ready for benchmarking.")
-
-    configuration["ssid"] = ssid
 
     post_process = False
 
@@ -125,7 +155,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
         if event == "Benchmark":
             if current_selection is not None:
 
-                iw = processIW(target_interface)
+                iw = process_iw(target_interface)
                 if iw["ssid"] != ssid:
                     sg.popup_error("SSID mismatch!")
                     print("SSID mismatch!")
@@ -134,21 +164,21 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                         print("Running benchmark")
                         results = {}
 
-                        if "tcp_r" in configuration["modes"]:
+                        if "tcp_r" in get_property_from(configuration, "modes"):
                             iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="tcp")
                             results["download_bits_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"]
                             results["download_bytes_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"] / 8
                             results["download_bytes_data_tcp"] = iperf_download["end"]["sum_received"]["bytes"]
                             results["download_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
 
-                        if "tcp" in configuration["modes"]:
+                        if "tcp" in get_property_from(configuration, "modes"):
                             iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="tcp")
                             results["upload_bits_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"]
                             results["upload_bytes_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
                             results["upload_bytes_data_tcp"] = iperf_download["end"]["sum_sent"]["bytes"]
                             results["upload_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
 
-                        if "udp_r" in configuration["modes"]:
+                        if "udp_r" in get_property_from(configuration, "modes"):
                             iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="udp")
                             results["download_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
                             results["download_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
@@ -158,7 +188,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                             results["download_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
                             results["download_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
 
-                        if "udp" in configuration["modes"]:
+                        if "udp" in get_property_from(configuration, "modes"):
                             iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="udp")
                             results["upload_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
                             results["upload_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
@@ -168,7 +198,7 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                             results["upload_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
                             results["upload_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
 
-                        if "speedtest" in configuration["modes"]:
+                        if "speedtest" in get_property_from(configuration, "modes"):
                             speedtest_download = run_speedtest()
                             results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
                             results["speedtest_latency"] = speedtest_download["ping"]["latency"]
@@ -234,13 +264,14 @@ def start_gui(target_interface, floor_map, iperf_ip, iperf_port, ssid, input_fil
                 sg.popup_error("Unable to save to disk!")
 
         if event == "Plot":
-            if processed_results(benchmark_points) >= 4:
+            valid_benchmark_points = processed_results(benchmark_points)
+            if valid_benchmark_points >= 4:
                 post_process = True
                 print("Exporting Results")
                 break
             else:
                 sg.popup_error("Not enough benchmark points! Try benchmarking {} more."
-                               .format(4 - len(benchmark_points.keys())))
+                               .format(4 - valid_benchmark_points))
 
         if event == "Clear All":
             benchmark_points, current_selection = replot(graph, benchmark_points, clear=True)

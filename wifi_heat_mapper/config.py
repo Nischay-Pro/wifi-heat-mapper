@@ -1,5 +1,8 @@
-from wifi_heat_mapper.misc import TColor, check_application
+from wifi_heat_mapper.misc import TColor, check_application, process_iw, save_json, get_application_output
+from wifi_heat_mapper import __version__
 from collections import OrderedDict
+import os
+import pathlib
 
 
 class ConfigurationOptions:
@@ -107,7 +110,8 @@ class ConfigurationOptions:
     }
 
 
-def start_config():
+def start_config(config_file):
+    print("Detecting benchmarking capabilities.")
     supported_modes = []
     if check_application("iperf3"):
         supported_modes.append("iperf3")
@@ -170,7 +174,66 @@ def start_config():
         print("No option was selected.")
         exit(1)
     selection = tuple(set(selection))
-    return {"graphs": graph_key, "modes": selection, "backends": supported_modes}
+
+    ssid = None
+    target_interface = None
+
+    if not check_application("iw"):
+        print("Could not detect iw (Wireless tools for Linux)")
+        exit(1)
+
+    while True:
+        target_interface = input("Please enter the target wireless interface to run benchmark on (example: wlan0): ").strip()
+        if not target_interface.isalnum():
+            print("Invalid interface")
+            exit(1)
+        cmd = "cat /sys/class/net/{}/operstate".format(target_interface)
+        check_interface = get_application_output(cmd, shell=True, timeout=10)
+        if check_interface == "invalid":
+            print("Interface {} does not exist!".format(target_interface))
+            exit(1)
+
+        elif check_interface == "timeout":
+            print("Unable to get interface {} status".format(target_interface))
+            exit(1)
+
+        check_interface = check_interface.split("\n")[0]
+        if check_interface != "up":
+            print("Interface {} is not ready.".format(target_interface))
+            exit(1)
+
+        break
+
+    while True:
+        ssid = process_iw(target_interface)["ssid"]
+        response = input("You are connected to {}{}{}. Is this the interface you want to benchmark on? (y/N) "
+                         .format(TColor.BLUE, ssid, TColor.RESET)).lower()
+
+        accept = ("y", "yes")
+        if response in accept:
+            break
+
+    config_data = {
+        "configuration":
+            {
+                "graphs": graph_key,
+                "modes": selection,
+                "backends": supported_modes,
+                "version": __version__,
+                "target_interface": target_interface,
+                "ssid": ssid,
+            },
+        "results": {}
+    }
+
+    config_file = os.path.abspath(config_file)
+
+    if pathlib.Path(config_file).suffix != ".json":
+        config_file += ".json"
+
+    if save_json(config_file, config_data):
+        print("Successfully bootstrapped configuration.")
+        print("Configuration file saved at: {}".format(config_file))
 
 
 def print_graph_to_console(index, title, description):

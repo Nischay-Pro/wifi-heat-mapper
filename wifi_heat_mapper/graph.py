@@ -69,7 +69,7 @@ class GraphPlot:
         fig, ax = plt.subplots(1, 1)
 
         bench_plot = ax.contourf(xi, yi, zi, cmap="RdYlBu_r", vmin=self.vmin, vmax=self.vmax,
-                                 alpha=0.5, zorder=150, antialiased=True)
+                                 alpha=0.5, zorder=150, antialiased=True, levels=100)
 
         ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o',
                 markeredgecolor='black', markeredgewidth=0.5, linestyle='None', markersize=5,

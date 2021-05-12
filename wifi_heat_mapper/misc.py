@@ -34,7 +34,25 @@ def get_application_output(command, shell=False, timeout=None):
         return "timeout"
 
 
-def processIW(target_interface):
+def verify_interface(target_interface):
+    cmd = "cat /sys/class/net/{}/operstate".format(target_interface)
+    check_interface = get_application_output(cmd, shell=True, timeout=10)
+    if check_interface == "invalid":
+        print("Interface {} does not exist!".format(target_interface))
+        exit(1)
+    elif check_interface == "timeout":
+        print("Unable to get interface {} status".format(target_interface))
+        exit(1)
+
+    check_interface = check_interface.split("\n")[0]
+    if check_interface != "up":
+        print("Interface {} is not ready.".format(target_interface))
+        exit(1)
+
+
+def process_iw(target_interface):
+
+    verify_interface(target_interface)
 
     iw_info = get_application_output(
         ["iw {} info".format(target_interface)],
@@ -104,3 +122,10 @@ def load_json(file_path):
             return json.load(f)
     except:
         return False
+
+
+def get_property_from(dict, key):
+    try:
+        return dict[key]
+    except KeyError:
+        raise ValueError("Could not retrieve property {}".format(key)) from None
