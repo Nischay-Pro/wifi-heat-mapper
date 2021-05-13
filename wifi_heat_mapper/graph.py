@@ -3,8 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.pyplot import imread
 from scipy.interpolate import Rbf
-from wifi_heat_mapper.config import ConfigurationOptions
 from tqdm import tqdm
+from wifi_heat_mapper.config import ConfigurationOptions
+from wifi_heat_mapper.misc import load_json, get_property_from
+import os
 
 
 class GraphPlot:
@@ -48,7 +50,7 @@ class GraphPlot:
         if self.vmax is None:
             self.vmax = max(self.processed_results["z"])
 
-    def generate_plot(self):
+    def generate_plot(self, levels, dpi, file_type):
         self.process_result()
         self.set_floor_map_dimensions()
         self.add_zero_boundary()
@@ -69,7 +71,7 @@ class GraphPlot:
         fig, ax = plt.subplots(1, 1)
 
         bench_plot = ax.contourf(xi, yi, zi, cmap="RdYlBu_r", vmin=self.vmin, vmax=self.vmax,
-                                 alpha=0.5, zorder=150, antialiased=True, levels=100)
+                                 alpha=0.5, zorder=150, antialiased=True, levels=levels)
 
         ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o',
                 markeredgecolor='black', markeredgewidth=0.5, linestyle='None', markersize=5,
@@ -86,13 +88,26 @@ class GraphPlot:
         plt.title("{}".format(ConfigurationOptions.configuration[self.key]["description"]))
         plt.axis('off')
         plt.legend(bbox_to_anchor=(0.3, -0.02))
-        file_name = "{}.png".format(self.key)
-        plt.savefig(file_name, dpi=300)
+        file_name = "{}.{}".format(self.key, file_type)
+        plt.savefig(file_name, format=file_type, dpi=dpi)
 
 
-def generate_graph(data, floor_map):
-    benchmark_results = data["results"]
-    configuration = data["configuration"]
+def generate_graph(data, floor_map, levels=100, dpi=300, file_type="png"):
+
+    file_type = file_type.lower().replace(".", "")
+    supported_formats = ["png", "pdf", "ps", "eps", "svg"]
+    if file_type not in supported_formats:
+        print("Unsupported file type.")
+        exit(1)
+
+    if not isinstance(data, dict):
+        data = os.path.abspath(data)
+        data = load_json(data)
+        if not data:
+            print("Could not load configuration file.")
+            exit(1)
+    benchmark_results = get_property_from(data, "results")
+    configuration = get_property_from(data, "configuration")
     graph_modes = ConfigurationOptions.configuration
     for key_name in tqdm(configuration["graphs"], desc="Generating Plots"):
         vmin = None
@@ -101,5 +116,6 @@ def generate_graph(data, floor_map):
             vmin = graph_modes[key_name]["vmin"]
         if "vmax" in graph_modes[key_name]:
             vmax = graph_modes[key_name]["vmax"]
-        GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax).generate_plot()
-    print("Finished plotting")
+        GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax).generate_plot(levels=levels, dpi=dpi,
+                                                                                              file_type=file_type)
+    print("Finished plotting.")

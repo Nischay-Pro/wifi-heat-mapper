@@ -6,7 +6,7 @@ with open('README.md') as file:
 
 install_requirements = [
     "iperf3>=0.1.11",
-    "matplotlib>=3.4.2",
+    "matplotlib>=3.4.0",
     "tqdm>=4.55.0",
     "Pillow>=8.2.0",
     "scipy>=1.6.0",
