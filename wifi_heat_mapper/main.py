@@ -49,6 +49,9 @@ def driver():
         "--format", "-f", dest="file_type", required=False, default="png",
         help="Export file format for generated plots. Default (png)"
     )
+    subparsers.add_parser(
+        "help", description="Show this help message and exit",
+        help="Show this help message and exit")
     parser.add_argument(
         "-V", "--version", action="store_true", help="show version number and exit")
     args = parser.parse_args()
@@ -70,6 +73,10 @@ def driver():
     elif args.mode == "plot":
         generate_graph(args.config_file, args.floor_map, levels=int(args.levels), dpi=int(args.dpi),
                        file_type=args.file_type)
+
+    elif args.mode == "help":
+        parser.print_help()
+        parser.exit()
 
 
 def print_version():
