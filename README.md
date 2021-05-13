@@ -111,12 +111,39 @@ You will be presented with a canvas with your floor map loaded.
 
 ![GUI-3](images/gui-3.png)
 
-3. Select `Benchmark` and wait for a few seconds (10 seconds to 2 minutes) depending on the graphs you have requested. Once benchmarking is done the circle's fill color changes from gray to light blue.
+3. Select `Benchmark` and wait for a few seconds (10 seconds to 2 minutes) depending on the graphs you have requested. Once benchmarking is done the circle's fill color changes from gray to light blue. Alternatively, if you would like to rerun benchmarking simply select any point using the cursor; the black border becomes blue. You can now right-click and select `Benchmark` to recapture metrics.
 
 ![GUI-4](images/gui-4.png)
 
-4. Now move to the new position you want to benchmark from and select the rough position in the canvas.
+4. Now move to a new position you want to benchmark from and select the rough position in the canvas.
 5. whm requires atleast 4 points to generate plots. I strongly recommend profiling as many points as possible to increase the accuracy of the heatmap.
+
+6. Once completed click on `Save Results` to save the metrics to file. You can then plot your metrics by pressing `Plot`.
+
+#### Resuming from a previous state
+
+To resume from a previous benchmarking state simply repeat the command you used to run the benchmarking initially. All results are stored in the configuration file the user has specified initially.
+
+#### Plotting
+
+whm also offers user with additional command-line arguments when plotting.
+
+To generate plots with custom flags you can specify them using the `whm plot` command.
+
+```bash
+$ whm plot -m ./examples/sample_floor_map.jpg -c config.json -l 100 -d 300 -f png 
+```
+
+Command-line options used:
+
+* `-m` or `--map` is the path to the floop map.
+* `-c` or `--config` is the path to the configuration file you bootstrapped earlier.
+* `-l` or `--levels` (optional) is the number and positions of the contour lines / regions. Default (100)
+* `-d` or `--dpi` (optional) is the resolution of the figure in dots-per-inch. Default (300)
+* `-f` or `--format` (optional) is used to specify the export file format for generated plots. Default (png). 
+Supported options include (png, pdf, ps, eps, svg)
+
+The directory from which the user has run the command will contain the graphs which were requested during bootstrap.
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
