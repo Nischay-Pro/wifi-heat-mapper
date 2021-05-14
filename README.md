@@ -22,7 +22,9 @@ This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com
 * PySimpleGUI >= 4.34.0
 
 ### Optional
-* [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) >= 1.0.0.2
+* [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) >= 1.0.0.2 (Recommended)
+or 
+* [Sivel Speedtest CLI](https://github.com/sivel/speedtest-cli) >= 2.1.3 (Jitter is not available)
 
 ## Installation
 
