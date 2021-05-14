@@ -9,6 +9,10 @@ from wifi_heat_mapper.misc import load_json, get_property_from
 import os
 
 
+class MissingMetricError(Exception):
+    pass
+
+
 class GraphPlot:
     def __init__(self, results, key, floor_map, vmin=None, vmax=None):
         self.results = results
@@ -25,7 +29,10 @@ class GraphPlot:
             if self.results[result]["results"] is not None:
                 processed_results["x"].append(self.results[result]["position"]["x"])
                 processed_results["y"].append(self.results[result]["position"]["y"])
-                processed_results["z"].append(self.results[result]["results"][self.key])
+                try:
+                    processed_results["z"].append(self.results[result]["results"][self.key])
+                except KeyError:
+                    raise MissingMetricError("Missing Metric {0}".format(self.key)) from None
                 if self.results[result]["station"]:
                     processed_results["sx"].append(self.results[result]["position"]["x"])
                     processed_results["sy"].append(self.results[result]["position"]["y"])
@@ -85,10 +92,10 @@ class GraphPlot:
                   origin="lower")
 
         fig.colorbar(bench_plot)
-        plt.title("{}".format(ConfigurationOptions.configuration[self.key]["description"]))
+        plt.title("{0}".format(ConfigurationOptions.configuration[self.key]["description"]))
         plt.axis('off')
         plt.legend(bbox_to_anchor=(0.3, -0.02))
-        file_name = "{}.{}".format(self.key, file_type)
+        file_name = "{0}.{1}".format(self.key, file_type)
         plt.savefig(file_name, format=file_type, dpi=dpi)
 
 

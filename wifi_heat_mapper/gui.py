@@ -1,7 +1,7 @@
 import PySimpleGUI as sg
 import os.path
 from wifi_heat_mapper.misc import run_iperf, run_speedtest, process_iw, load_json, save_json, verify_iperf
-from wifi_heat_mapper.misc import get_property_from
+from wifi_heat_mapper.misc import get_property_from, SpeedTestMode
 from wifi_heat_mapper.graph import generate_graph
 from PIL import Image, ImageTk
 import io
@@ -20,12 +20,13 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
             configuration = get_property_from(data, "configuration")
             ssid = get_property_from(configuration, "ssid")
             target_interface = get_property_from(configuration, "target_interface")
+            speedtest_mode = SpeedTestMode(get_property_from(configuration, "speedtest"))
 
             connected_ssid = process_iw(target_interface)["ssid"]
             if connected_ssid != ssid:
-                print("Configuration file is for {} but user connected to {}"
+                print("Configuration file is for {0} but user connected to {1}"
                       .format(ssid, connected_ssid))
-                print("Please connect to {} and try benchmarking again."
+                print("Please connect to {0} and try benchmarking again."
                       .format(ssid))
                 exit(1)
 
@@ -42,8 +43,8 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
         iperf_ip = iperf_server
         iperf_port = 5201
 
-    print("Loaded configuration file from: {}".format(config_file))
-    print("Target Interface: {} and SSID: {}".format(target_interface, ssid))
+    print("Loaded configuration file from: {0}".format(config_file))
+    print("Target Interface: {0} and SSID: {1}".format(target_interface, ssid))
 
     right_click_items = ["Items", ["&Benchmark", "&Delete", "&Mark/Un-Mark as Station"]]
 
@@ -89,7 +90,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
     current_selection = None
     benchmark_count = len(benchmark_points.keys())
     if benchmark_count != 0:
-        print("Restoring previous benchmark points [{}]".format(benchmark_count))
+        print("Restoring previous benchmark points [{0}]".format(benchmark_count))
         benchmark_points, current_selection = replot(graph, benchmark_points)
 
     if "iperf3" in configuration["backends"] and not verify_iperf(iperf_ip, iperf_port):
@@ -199,15 +200,22 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                             results["upload_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
 
                         if "speedtest" in get_property_from(configuration, "modes"):
-                            speedtest_download = run_speedtest()
-                            results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
-                            results["speedtest_latency"] = speedtest_download["ping"]["latency"]
-                            results["speedtest_download_bandwidth"] = speedtest_download["download"]["bandwidth"]
-                            results["speedtest_download_size"] = speedtest_download["download"]["bytes"]
-                            results["speedtest_download_elapsed_ms"] = speedtest_download["download"]["elapsed"]
-                            results["speedtest_upload_bandwidth"] = speedtest_download["upload"]["bandwidth"]
-                            results["speedtest_upload_size"] = speedtest_download["upload"]["bytes"]
-                            results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
+                            speedtest_download = run_speedtest(speedtest_mode)
+                            if speedtest_mode == SpeedTestMode.OOKLA:
+                                results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
+                                results["speedtest_latency"] = speedtest_download["ping"]["latency"]
+                                results["speedtest_download_bandwidth"] = speedtest_download["download"]["bandwidth"]
+                                results["speedtest_download_size"] = speedtest_download["download"]["bytes"]
+                                results["speedtest_download_elapsed_ms"] = speedtest_download["download"]["elapsed"]
+                                results["speedtest_upload_bandwidth"] = speedtest_download["upload"]["bandwidth"]
+                                results["speedtest_upload_size"] = speedtest_download["upload"]["bytes"]
+                                results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
+                            elif speedtest_mode == SpeedTestMode.SIVEL:
+                                results["speedtest_latency"] = speedtest_download["server"]["latency"]
+                                results["speedtest_download_bandwidth"] = speedtest_download["download"]
+                                results["speedtest_download_size"] = speedtest_download["bytes_received"]
+                                results["speedtest_upload_bandwidth"] = speedtest_download["upload"]
+                                results["speedtest_upload_size"] = speedtest_download["bytes_sent"]
 
                         results["signal_strength"] = iw["signal_strength"]
                         results["signal_quality"] = iw["signal_strength"] + 110
@@ -270,7 +278,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                 print("Exporting Results")
                 break
             else:
-                sg.popup_error("Not enough benchmark points! Try benchmarking {} more."
+                sg.popup_error("Not enough benchmark points! Try benchmarking {0} more."
                                .format(4 - valid_benchmark_points))
 
         if event == "Clear All":

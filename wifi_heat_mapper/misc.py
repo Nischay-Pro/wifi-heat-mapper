@@ -4,6 +4,8 @@ import re
 import socket
 import json
 import iperf3
+import importlib
+from enum import IntEnum
 
 
 class TColor:
@@ -19,6 +21,12 @@ class TColor:
     UNDERLINE = "\u001b[4m"
 
 
+class SpeedTestMode(IntEnum):
+    UNKNOWN = -1
+    OOKLA = 0
+    SIVEL = 1
+
+
 def check_application(name):
     return which(name) is not None
 
@@ -32,21 +40,23 @@ def get_application_output(command, shell=False, timeout=None):
         return "invalid"
     except subprocess.TimeoutExpired:
         return "timeout"
+    except FileNotFoundError:
+        return "unavailable"
 
 
 def verify_interface(target_interface):
-    cmd = "cat /sys/class/net/{}/operstate".format(target_interface)
+    cmd = "cat /sys/class/net/{0}/operstate".format(target_interface)
     check_interface = get_application_output(cmd, shell=True, timeout=10)
     if check_interface == "invalid":
-        print("Interface {} does not exist!".format(target_interface))
+        print("Interface {0} does not exist!".format(target_interface))
         exit(1)
     elif check_interface == "timeout":
-        print("Unable to get interface {} status".format(target_interface))
+        print("Unable to get interface {0} status".format(target_interface))
         exit(1)
 
     check_interface = check_interface.split("\n")[0]
     if check_interface != "up":
-        print("Interface {} is not ready.".format(target_interface))
+        print("Interface {0} is not ready.".format(target_interface))
         exit(1)
 
 
@@ -55,11 +65,11 @@ def process_iw(target_interface):
     verify_interface(target_interface)
 
     iw_info = get_application_output(
-        ["iw {} info".format(target_interface)],
+        ["iw {0} info".format(target_interface)],
         shell=True, timeout=10).replace("\t", " ")
 
     if iw_info == "invalid":
-        print("The interface {} is not a wireless interface".format(target_interface))
+        print("The interface {0} is not a wireless interface".format(target_interface))
         exit(1)
 
     results = {}
@@ -70,7 +80,7 @@ def process_iw(target_interface):
     results["channel_frequency"] = int(tmp[1].replace("(", ""))
     results["ssid"] = re.findall(r"(?<=ssid )(.*)", iw_info)[0]
 
-    iw_info = get_application_output(["iw {} station dump".format(target_interface)],
+    iw_info = get_application_output(["iw {0} station dump".format(target_interface)],
                                      shell=True, timeout=10).replace("\t", " ")
 
     results["ssid_mac"] = re.findall(r"(?<=Station )(.*)(?= \()", iw_info)[0]
@@ -102,9 +112,22 @@ def run_iperf(ip, port, download=True, protocol="tcp"):
     return iperf_result.json
 
 
-def run_speedtest():
-    speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"], timeout=120))
-    return speedtest_result
+def run_speedtest(mode):
+    if mode == SpeedTestMode.OOKLA:
+        speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"], timeout=120))
+        return speedtest_result
+    elif mode == SpeedTestMode.SIVEL:
+        speedtest_result = json.loads(get_application_output(["speedtest", "--json"], timeout=120))
+        return speedtest_result
+
+
+def check_speedtest():
+    speedtest_result = get_application_output(["speedtest", "--version"], timeout=10)
+    if "Speedtest by Ookla" in speedtest_result:
+        return SpeedTestMode.OOKLA
+    elif importlib.util.find_spec("speedtest") is not None:
+        return SpeedTestMode.SIVEL
+    return SpeedTestMode.UNKNOWN
 
 
 def save_json(file_path, data):
@@ -128,4 +151,4 @@ def get_property_from(dict, key):
     try:
         return dict[key]
     except KeyError:
-        raise ValueError("Could not retrieve property {}".format(key)) from None
+        raise ValueError("Could not retrieve property {0}".format(key)) from None
