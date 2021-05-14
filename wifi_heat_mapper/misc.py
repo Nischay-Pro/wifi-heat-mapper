@@ -27,6 +27,17 @@ class SpeedTestMode(IntEnum):
     SIVEL = 1
 
 
+HUMAN_BYTE_SIZE = [
+    (1 << 60, "EiB"),
+    (1 << 50, "PiB"),
+    (1 << 40, "TiB"),
+    (1 << 30, "GiB"),
+    (1 << 20, "MiB"),
+    (1 << 10, "KiB"),
+    (1, "Byte")
+]
+
+
 def check_application(name):
     return which(name) is not None
 
@@ -152,3 +163,16 @@ def get_property_from(dict, key):
         return dict[key]
     except KeyError:
         raise ValueError("Could not retrieve property {0}".format(key)) from None
+
+
+def bytes_to_human_readable(bytes, ndigits=2, limit=None):
+    if limit is None:
+        for limit, suffix in HUMAN_BYTE_SIZE:
+            if bytes >= limit:
+                break
+
+        if limit == 1 and bytes > 1:
+            suffix += "s"
+
+    readable_bytes = round((bytes / limit), ndigits)
+    return (readable_bytes, limit, suffix)

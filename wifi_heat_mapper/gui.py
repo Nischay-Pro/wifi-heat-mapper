@@ -212,9 +212,9 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                                 results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
                             elif speedtest_mode == SpeedTestMode.SIVEL:
                                 results["speedtest_latency"] = speedtest_download["server"]["latency"]
-                                results["speedtest_download_bandwidth"] = speedtest_download["download"]
+                                results["speedtest_download_bandwidth"] = speedtest_download["download"] / 8
                                 results["speedtest_download_size"] = speedtest_download["bytes_received"]
-                                results["speedtest_upload_bandwidth"] = speedtest_download["upload"]
+                                results["speedtest_upload_bandwidth"] = speedtest_download["upload"] / 8
                                 results["speedtest_upload_size"] = speedtest_download["bytes_sent"]
 
                         results["signal_strength"] = iw["signal_strength"]

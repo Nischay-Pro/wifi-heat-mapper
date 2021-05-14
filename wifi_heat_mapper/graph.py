@@ -5,8 +5,9 @@ from matplotlib.pyplot import imread
 from scipy.interpolate import Rbf
 from tqdm import tqdm
 from wifi_heat_mapper.config import ConfigurationOptions
-from wifi_heat_mapper.misc import load_json, get_property_from
+from wifi_heat_mapper.misc import load_json, get_property_from, bytes_to_human_readable
 import os
+import heapq
 
 
 class MissingMetricError(Exception):
@@ -14,7 +15,7 @@ class MissingMetricError(Exception):
 
 
 class GraphPlot:
-    def __init__(self, results, key, floor_map, vmin=None, vmax=None):
+    def __init__(self, results, key, floor_map, vmin=None, vmax=None, conversion=False):
         self.results = results
         self.floor_map = floor_map
         self.vmin = vmin
@@ -22,6 +23,8 @@ class GraphPlot:
         self.key = key
         self.processed_results = None
         self.floor_map_dimensions = None
+        self.conversion = conversion
+        self.suffix = None
 
     def process_result(self):
         processed_results = {"x": [], "y": [], "z": [], "sx": [], "sy": []}
@@ -57,10 +60,31 @@ class GraphPlot:
         if self.vmax is None:
             self.vmax = max(self.processed_results["z"])
 
+    def apply_conversion(self):
+        smallest_values = heapq.nsmallest(2, set(self.processed_results["z"]))
+        smallest_value = smallest_values[0]
+        if self.vmin == smallest_values[0] == 0:
+            smallest_value = smallest_values[1]
+
+        limit = bytes_to_human_readable(smallest_value, 2, None)
+        if "bits" in self.key:
+            if "Byte" in limit[2]:
+                self.suffix = limit[2].replace("Byte", "Bit")
+            else:
+                self.suffix = limit[2].replace("B", "b")
+        else:
+            self.suffix = limit[2]
+        factor = limit[1]
+        self.processed_results["z"] = [z_val / factor for z_val in self.processed_results["z"]]
+        self.vmin /= factor
+        self.vmax /= factor
+
     def generate_plot(self, levels, dpi, file_type):
         self.process_result()
         self.set_floor_map_dimensions()
         self.add_zero_boundary()
+        if self.conversion:
+            self.apply_conversion()
 
         minimum = 0
         maximum = max(self.floor_map_dimensions)
@@ -92,7 +116,10 @@ class GraphPlot:
                   origin="lower")
 
         fig.colorbar(bench_plot)
-        plt.title("{0}".format(ConfigurationOptions.configuration[self.key]["description"]))
+        desc = ConfigurationOptions.configuration[self.key]["description"]
+        if self.suffix is not None:
+            desc = desc.format(self.suffix)
+        plt.title("{0}".format(desc))
         plt.axis('off')
         plt.legend(bbox_to_anchor=(0.3, -0.02))
         file_name = "{0}.{1}".format(self.key, file_type)
@@ -123,6 +150,7 @@ def generate_graph(data, floor_map, levels=100, dpi=300, file_type="png"):
             vmin = graph_modes[key_name]["vmin"]
         if "vmax" in graph_modes[key_name]:
             vmax = graph_modes[key_name]["vmax"]
-        GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax).generate_plot(levels=levels, dpi=dpi,
-                                                                                              file_type=file_type)
+        GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax,
+                  conversion=graph_modes[key_name]["conversion"])\
+            .generate_plot(levels=levels, dpi=dpi, file_type=file_type)
     print("Finished plotting.")

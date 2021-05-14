@@ -14,6 +14,7 @@ class ConfigurationOptions:
         "vmin": 0,
         "vmax": 70,
         "mode": ["base"],
+        "conversion": False,
     }
     configuration["signal_quality_percent"] = {
         "description": "Wi-Fi Signal Quality (in percentage)",
@@ -21,6 +22,7 @@ class ConfigurationOptions:
         "vmin": 0,
         "vmax": 100,
         "mode": ["base"],
+        "conversion": False,
     }
     configuration["signal_strength"] = {
         "description": "Wi-Fi Signal Strength (in dBm)",
@@ -28,85 +30,100 @@ class ConfigurationOptions:
         "vmin": -100,
         "vmax": 0,
         "mode": ["base"],
+        "conversion": False,
     }
     configuration["download_bits_tcp"] = {
-        "description": "Wi-Fi Download [TCP] (in bits/s)",
+        "description": "Wi-Fi Download [TCP] (in {0}/s)",
         "requirements": ["tcp_r"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["download_bytes_tcp"] = {
-        "description": "Wi-Fi Download [TCP] (in bytes/s)",
+        "description": "Wi-Fi Download [TCP] (in {0}/s)",
         "requirements": ["tcp_r"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["upload_bits_tcp"] = {
-        "description": "Wi-Fi Upload [TCP] (in bits/s)",
+        "description": "Wi-Fi Upload [TCP] (in {0}/s)",
         "requirements": ["tcp"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["upload_bytes_tcp"] = {
-        "description": "Wi-Fi Upload [TCP] (in bytes/s)",
+        "description": "Wi-Fi Upload [TCP] (in {0}/s)",
         "requirements": ["tcp"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["download_bits_udp"] = {
-        "description": "Wi-Fi Download [UDP] (in bits/s)",
+        "description": "Wi-Fi Download [UDP] (in {0}/s)",
         "requirements": ["udp_r"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["download_bytes_udp"] = {
-        "description": "Wi-Fi Download [UDP] (in bytes/s)",
+        "description": "Wi-Fi Download [UDP] (in {0}/s)",
         "requirements": ["udp_r"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["upload_bits_udp"] = {
-        "description": "Wi-Fi Upload [UDP] (in bits/s)",
+        "description": "Wi-Fi Upload [UDP] (in {0}/s)",
         "requirements": ["udp"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["upload_bytes_udp"] = {
-        "description": "Wi-Fi Upload [UDP] (in bytes/s)",
+        "description": "Wi-Fi Upload [UDP] (in {0}/s)",
         "requirements": ["udp"],
         "mode": ["iperf3"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["download_jitter_udp"] = {
         "description": "Wi-Fi Download Jitter (in ms)",
         "requirements": ["udp_r"],
+        "conversion": False,
     }
     configuration["upload_jitter_udp"] = {
         "description": "Wi-Fi Upload Jitter (in ms)",
         "requirements": ["udp"],
         "mode": ["iperf3"],
+        "conversion": False,
     }
     configuration["speedtest_latency"] = {
         "description": "Speedtest Wi-Fi Latency (in ms)",
         "requirements": ["speedtest"],
         "mode": ["speedtest", "speedtest-ookla"],
+        "conversion": False,
     }
     configuration["speedtest_jitter"] = {
         "description": "Speedtest Wi-Fi Jitter (in ms)",
         "requirements": ["speedtest"],
         "mode": ["speedtest-ookla"],
+        "conversion": False,
     }
     configuration["speedtest_download_bandwidth"] = {
-        "description": "Speedtest Wi-Fi Download [TCP] (in bytes/s)",
+        "description": "Speedtest Wi-Fi Download [TCP] (in {0}/s)",
         "requirements": ["speedtest"],
         "mode": ["speedtest", "speedtest-ookla"],
         "vmin": 0,
+        "conversion": True,
     }
     configuration["speedtest_upload_bandwidth"] = {
-        "description": "Speedtest Wi-Fi Upload [TCP] (in bytes/s)",
+        "description": "Speedtest Wi-Fi Upload [TCP] (in {0}/s)",
         "requirements": ["speedtest"],
         "mode": ["speedtest", "speedtest-ookla"],
         "vmin": 0,
+        "conversion": True,
     }
 
 
