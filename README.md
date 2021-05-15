@@ -177,6 +177,10 @@ The directory from which the user has run the command will contain the graphs th
 ## Examples
 
 ### Floor map
+![GUI-1](images/gui-1.png)
+
+## Floor map with benchmark points
+![GUI-5](images/gui-5.png)
 
 
 
