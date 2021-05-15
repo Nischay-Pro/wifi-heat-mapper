@@ -38,6 +38,10 @@ HUMAN_BYTE_SIZE = [
 ]
 
 
+class ParseError(Exception):
+    pass
+
+
 def check_application(name):
     return which(name) is not None
 
@@ -75,27 +79,28 @@ def process_iw(target_interface):
 
     verify_interface(target_interface)
 
-    iw_info = get_application_output(
-        ["iw {0} info".format(target_interface)],
-        shell=True, timeout=10).replace("\t", " ")
+    try:
+        iw_info = get_application_output(
+            ["iw {0} info".format(target_interface)],
+            shell=True, timeout=10).replace("\t", " ")
 
-    if iw_info == "invalid":
-        print("The interface {0} is not a wireless interface".format(target_interface))
-        exit(1)
+        if iw_info == "invalid":
+            print("The interface {0} is not a wireless interface".format(target_interface))
+            exit(1)
 
-    results = {}
-    results["interface"] = re.findall(r"(?<=Interface )(.*)", iw_info)[0]
-    results["interface_mac"] = re.findall(r"(?<=addr ac:)(.*)", iw_info)[0]
-    tmp = re.findall(r"(?<=channel )(.*?)(?=\,)", iw_info)[0].split(" ")
-    results["channel"] = int(tmp[0])
-    results["channel_frequency"] = int(tmp[1].replace("(", ""))
-    results["ssid"] = re.findall(r"(?<=ssid )(.*)", iw_info)[0]
-
-    iw_info = get_application_output(["iw {0} station dump".format(target_interface)],
-                                     shell=True, timeout=10).replace("\t", " ")
-
-    results["ssid_mac"] = re.findall(r"(?<=Station )(.*)(?= \()", iw_info)[0]
-    results["signal_strength"] = int(re.findall(r"(?<=signal avg: )(.*)", iw_info)[0].split(" ")[0])
+        results = {}
+        results["interface"] = re.findall(r"(?<=Interface )(.*)", iw_info)[0]
+        results["interface_mac"] = re.findall(r"([0-9a-fA-F]{2}[:]){5}([0-9a-fA-F]{2})", iw_info)[0]
+        tmp = re.findall(r"(?<=channel )(.*?)(?=\,)", iw_info)[0].split(" ")
+        results["channel"] = int(tmp[0])
+        results["channel_frequency"] = int(tmp[1].replace("(", ""))
+        results["ssid"] = re.findall(r"(?<=ssid )(.*)", iw_info)[0]
+        iw_info = get_application_output(["iw {0} station dump".format(target_interface)],
+                                         shell=True, timeout=10).replace("\t", " ")
+        results["ssid_mac"] = re.findall(r"(?<=Station )(.*)(?= \()", iw_info)[0]
+        results["signal_strength"] = int(re.findall(r"(?<=signal avg: )(.*)", iw_info)[0].split(" ")[0])
+    except IndexError:
+        raise ParseError("Unable to parse iw.") from None
     return results
 
 

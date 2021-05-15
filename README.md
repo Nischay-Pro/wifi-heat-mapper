@@ -12,7 +12,7 @@ This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com
 
 ## Dependencies
 ### Required
-* Python version: 3.7 - 3.9
+* Python version: 3.7 - 3.9 (with Tkinter)
 * iperf3 >= 0.1.11
 * matplotlib >= 3.4.0
 * tqdm >= 4.55.0
@@ -25,6 +25,33 @@ This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com
 * [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) >= 1.0.0.2 (Recommended)
 or 
 * [Sivel Speedtest CLI](https://github.com/sivel/speedtest-cli) >= 2.1.3 (Jitter is not available)
+
+### Tkinter Dependency
+
+By default Tkinter is not installed with Python. Users are requested to install Tkinter using their respective package managers.
+
+### Arch Linux and Manjaro
+```bash
+$ pacman -S tk
+```
+
+### Fedora, CentOS, RHEL and RockyLinux
+```bash
+$ dnf install python3-tkinter
+```
+
+### Debian and Ubuntu
+```bash
+$ apt install python3-tk
+```
+
+### openSUSE and SUSE Linux Enterprise
+```bash
+$ zypper install python3-tk
+```
+
+### Gentoo
+[Official Wiki instructions](https://wiki.gentoo.org/wiki/Tkinter)
 
 ## Installation
 
@@ -146,6 +173,12 @@ Command-line options used:
 Supported options include (png, pdf, ps, eps, svg)
 
 The directory from which the user has run the command will contain the graphs that the user requested during bootstrap.
+
+## Examples
+
+### Floor map
+
+
 
 ## Contributing
 Pull requests are welcome. For significant changes, please open an issue first to discuss what you would like to change.
