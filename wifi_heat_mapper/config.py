@@ -208,7 +208,7 @@ def start_config(config_file):
         exit(1)
 
     while True:
-        target_interface = input("Please enter the target wireless interface to run benchmark on (example: wlan0 or wlp2s0): ")
+        target_interface = input("Please enter the target wireless interface to run benchmark on (example: wlan0): ")
         target_interface = target_interface.strip()
         if not target_interface.isalnum():
             print("Invalid interface")
