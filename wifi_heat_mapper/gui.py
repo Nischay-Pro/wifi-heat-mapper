@@ -164,29 +164,25 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                     sg.popup_error("SSID mismatch!")
                     print("SSID mismatch!")
                 else:
-                    try:
-                        print("Running benchmark")
-                        results = {}
-                        benchmark_modes = get_property_from(configuration, "modes")
-                        benchmark_iterations = get_property_from(configuration, "benchmark_iterations")
-                        results = run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port,
-                                                 speedtest_mode, target_ip)
-                        results["signal_strength"] = iw["signal_strength"]
-                        results["signal_quality"] = iw["signal_strength"] + 110
-                        results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
-                        results["channel"] = iw["channel"]
-                        results["channel_frequency"] = iw["channel_frequency"]
-                        benchmark_points[current_selection]["results"] = results
+                    print("Running benchmark")
+                    results = {}
+                    benchmark_modes = get_property_from(configuration, "modes")
+                    benchmark_iterations = get_property_from(configuration, "benchmark_iterations")
+                    results = run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port,
+                                             speedtest_mode, target_ip)
+                    results["signal_strength"] = iw["signal_strength"]
+                    results["signal_quality"] = iw["signal_strength"] + 110
+                    results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
+                    results["channel"] = iw["channel"]
+                    results["channel_frequency"] = iw["channel_frequency"]
+                    benchmark_points[current_selection]["results"] = results
 
-                        benchmark_points[current_selection]["fill_color"] = "lightblue"
-                        benchmark_points, current_selection = replot(graph, benchmark_points)
+                    benchmark_points[current_selection]["fill_color"] = "lightblue"
+                    benchmark_points, current_selection = replot(graph, benchmark_points)
 
-                        print("Completed benchmark.")
-                        if not save_results_to_disk(output_file, configuration, benchmark_points):
-                            print("Unable to save to disk")
-                    except:
-                        print("Unable to perform benchmark.")
-                        sg.popup_error("Unable to perform benchmark.")
+                    print("Completed benchmark.")
+                    if not save_results_to_disk(output_file, configuration, benchmark_points):
+                        print("Unable to save to disk")
             else:
                 print("Please select a benchmark point.")
                 sg.popup_error("Please select a benchmark point.")
@@ -315,7 +311,10 @@ def save_results_to_disk(file_path, configuration_data, benchmark_points):
 
 def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode, bind_address):
     results = defaultdict(float)
-    progress = (len(benchmark_modes) - 1) * benchmark_iterations
+    if "base" in benchmark_modes:
+        progress = (len(benchmark_modes) - 1) * benchmark_iterations
+    else:
+        progress = len(benchmark_modes) * benchmark_iterations
     pbar = tqdm(total=progress)
     for _ in range(benchmark_iterations):
         if "tcp_r" in benchmark_modes:
