@@ -15,6 +15,7 @@ class ConfigurationOptions:
         "vmax": 70,
         "mode": ["base"],
         "conversion": False,
+        "reverse": False,
     }
     configuration["signal_quality_percent"] = {
         "description": "Wi-Fi Signal Quality (in percentage)",
@@ -23,6 +24,7 @@ class ConfigurationOptions:
         "vmax": 100,
         "mode": ["base"],
         "conversion": False,
+        "reverse": False,
     }
     configuration["signal_strength"] = {
         "description": "Wi-Fi Signal Strength (in dBm)",
@@ -31,6 +33,7 @@ class ConfigurationOptions:
         "vmax": 0,
         "mode": ["base"],
         "conversion": False,
+        "reverse": False,
     }
     configuration["download_bits_tcp"] = {
         "description": "Wi-Fi Download [TCP] (in {0}/s)",
@@ -38,6 +41,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["download_bytes_tcp"] = {
         "description": "Wi-Fi Download [TCP] (in {0}/s)",
@@ -45,6 +49,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["upload_bits_tcp"] = {
         "description": "Wi-Fi Upload [TCP] (in {0}/s)",
@@ -52,6 +57,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["upload_bytes_tcp"] = {
         "description": "Wi-Fi Upload [TCP] (in {0}/s)",
@@ -59,6 +65,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["download_bits_udp"] = {
         "description": "Wi-Fi Download [UDP] (in {0}/s)",
@@ -66,6 +73,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["download_bytes_udp"] = {
         "description": "Wi-Fi Download [UDP] (in {0}/s)",
@@ -73,6 +81,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["upload_bits_udp"] = {
         "description": "Wi-Fi Upload [UDP] (in {0}/s)",
@@ -80,6 +89,7 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["upload_bytes_udp"] = {
         "description": "Wi-Fi Upload [UDP] (in {0}/s)",
@@ -87,30 +97,36 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["download_jitter_udp"] = {
         "description": "Wi-Fi Download Jitter (in ms)",
         "requirements": ["udp_r"],
         "mode": ["iperf3"],
         "conversion": False,
+        "reverse": True,
     }
     configuration["upload_jitter_udp"] = {
         "description": "Wi-Fi Upload Jitter (in ms)",
         "requirements": ["udp"],
         "mode": ["iperf3"],
         "conversion": False,
+        "reverse": True,
+        "reverse": True,
     }
     configuration["speedtest_latency"] = {
         "description": "Speedtest Wi-Fi Latency (in ms)",
         "requirements": ["speedtest"],
         "mode": ["speedtest", "speedtest-ookla", "librespeed-cli"],
         "conversion": False,
+        "reverse": True,
     }
     configuration["speedtest_jitter"] = {
         "description": "Speedtest Wi-Fi Jitter (in ms)",
         "requirements": ["speedtest"],
         "mode": ["speedtest-ookla", "librespeed-cli"],
         "conversion": False,
+        "reverse": True,
     }
     configuration["speedtest_download_bandwidth"] = {
         "description": "Speedtest Wi-Fi Download [TCP] (in {0}/s)",
@@ -118,6 +134,7 @@ class ConfigurationOptions:
         "mode": ["speedtest", "speedtest-ookla", "librespeed-cli"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
     configuration["speedtest_upload_bandwidth"] = {
         "description": "Speedtest Wi-Fi Upload [TCP] (in {0}/s)",
@@ -125,6 +142,7 @@ class ConfigurationOptions:
         "mode": ["speedtest", "speedtest-ookla", "librespeed-cli"],
         "vmin": 0,
         "conversion": True,
+        "reverse": False,
     }
 
 

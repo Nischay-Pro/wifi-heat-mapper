@@ -15,7 +15,7 @@ class MissingMetricError(Exception):
 
 
 class GraphPlot:
-    def __init__(self, results, key, floor_map, vmin=None, vmax=None, conversion=False):
+    def __init__(self, results, key, floor_map, vmin=None, vmax=None, conversion=False, reverse=False):
         self.results = results
         self.floor_map = floor_map
         self.vmin = vmin
@@ -25,6 +25,7 @@ class GraphPlot:
         self.floor_map_dimensions = None
         self.conversion = conversion
         self.suffix = None
+        self.reverse = reverse
 
     def process_result(self):
         processed_results = {"x": [], "y": [], "z": [], "sx": [], "sy": []}
@@ -47,7 +48,10 @@ class GraphPlot:
         self.processed_results["y"] += [0, self.floor_map_dimensions[1],
                                         self.floor_map_dimensions[1], 0]
         self.set_min_max()
-        self.processed_results["z"] += [self.vmin] * 4
+        if self.reverse:
+            self.processed_results["z"] += [self.vmax] * 4
+        else:
+            self.processed_results["z"] += [self.vmin] * 4
 
     def set_floor_map_dimensions(self):
         im = Image.open(self.floor_map)
@@ -121,7 +125,7 @@ class GraphPlot:
             desc = desc.format(self.suffix)
         plt.title("{0}".format(desc))
         plt.axis('off')
-        plt.legend(bbox_to_anchor=(0.3, -0.02))
+        plt.legend(bbox_to_anchor=(0.55, -0.05), ncol=2)
         file_name = "{0}.{1}".format(self.key, file_type)
         plt.savefig(file_name, format=file_type, dpi=dpi)
 
@@ -151,6 +155,7 @@ def generate_graph(data, floor_map, levels=100, dpi=300, file_type="png"):
         if "vmax" in graph_modes[key_name]:
             vmax = graph_modes[key_name]["vmax"]
         GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax,
-                  conversion=graph_modes[key_name]["conversion"])\
+                  conversion=graph_modes[key_name]["conversion"],
+                  reverse=graph_modes[key_name]["reverse"])\
             .generate_plot(levels=levels, dpi=dpi, file_type=file_type)
     print("Finished plotting.")
