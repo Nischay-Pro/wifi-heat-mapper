@@ -22,6 +22,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
             configuration = get_property_from(data, "configuration")
             ssid = get_property_from(configuration, "ssid")
             target_interface = get_property_from(configuration, "target_interface")
+            target_ip = get_property_from(configuration, "target_ip")
             speedtest_mode = SpeedTestMode(get_property_from(configuration, "speedtest"))
 
             connected_ssid = process_iw(target_interface)["ssid"]
@@ -169,7 +170,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                         benchmark_modes = get_property_from(configuration, "modes")
                         benchmark_iterations = get_property_from(configuration, "benchmark_iterations")
                         results = run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port,
-                                                 speedtest_mode)
+                                                 speedtest_mode, target_ip)
                         results["signal_strength"] = iw["signal_strength"]
                         results["signal_quality"] = iw["signal_strength"] + 110
                         results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
@@ -181,6 +182,8 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                         benchmark_points, current_selection = replot(graph, benchmark_points)
 
                         print("Completed benchmark.")
+                        if not save_results_to_disk(output_file, configuration, benchmark_points):
+                            print("Unable to save to disk")
                     except:
                         print("Unable to perform benchmark.")
                         sg.popup_error("Unable to perform benchmark.")
@@ -301,13 +304,22 @@ def get_img_data(f, maxsize=(1200, 850), first=False):
     return ImageTk.PhotoImage(img)
 
 
-def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode):
+def save_results_to_disk(file_path, configuration_data, benchmark_points):
+    benchmark_points = de_select(benchmark_points)
+    data = {
+        "configuration": configuration_data,
+        "results": benchmark_points
+    }
+    return save_json(file_path, data)
+
+
+def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode, bind_address):
     results = defaultdict(float)
     progress = (len(benchmark_modes) - 1) * benchmark_iterations
     pbar = tqdm(total=progress)
     for _ in range(benchmark_iterations):
         if "tcp_r" in benchmark_modes:
-            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="tcp")
+            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=True, protocol="tcp")
             results["download_bits_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"]
             results["download_bytes_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"] / 8
             results["download_bytes_data_tcp"] += iperf_download["end"]["sum_received"]["bytes"]
@@ -315,7 +327,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "tcp" in benchmark_modes:
-            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="tcp")
+            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=False, protocol="tcp")
             results["upload_bits_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"]
             results["upload_bytes_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
             results["upload_bytes_data_tcp"] += iperf_download["end"]["sum_sent"]["bytes"]
@@ -323,7 +335,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "udp_r" in benchmark_modes:
-            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="udp")
+            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=True, protocol="udp")
             results["download_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
             results["download_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
             results["download_bytes_data_udp"] += iperf_download["end"]["sum"]["bytes"]
@@ -334,7 +346,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "udp" in benchmark_modes:
-            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="udp")
+            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=False, protocol="udp")
             results["upload_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
             results["upload_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
             results["upload_bytes_data_udp"] += iperf_download["end"]["sum"]["bytes"]
@@ -345,7 +357,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "speedtest" in benchmark_modes:
-            speedtest_download = run_speedtest(speedtest_mode)
+            speedtest_download = run_speedtest(speedtest_mode, bind_address)
             if speedtest_mode == SpeedTestMode.OOKLA:
                 results["speedtest_jitter"] += speedtest_download["ping"]["jitter"]
                 results["speedtest_latency"] += speedtest_download["ping"]["latency"]

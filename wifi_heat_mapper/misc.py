@@ -148,10 +148,11 @@ def verify_iperf(ip, port):
         return False
 
 
-def run_iperf(ip, port, download=True, protocol="tcp"):
+def run_iperf(ip, port, bind_address, download=True, protocol="tcp"):
     client = iperf3.Client()
     client.server_hostname = ip
     client.port = port
+    client.bind_address = bind_address
     client.reverse = False
     client.verbose = False
     client._errno
@@ -163,16 +164,18 @@ def run_iperf(ip, port, download=True, protocol="tcp"):
     return iperf_result.json
 
 
-def run_speedtest(mode):
+def run_speedtest(mode, bind_address):
     if mode == SpeedTestMode.OOKLA:
         try:
-            speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"], timeout=120))
+            speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json" "-i", bind_address],
+                                                                 timeout=120))
         except ValueError:
             raise ParseError("Unable to decode output from Speedtest Ookla") from None
         return speedtest_result
     elif mode == SpeedTestMode.SIVEL:
         try:
-            speedtest_result = json.loads(get_application_output(["speedtest", "--json"], timeout=120))
+            speedtest_result = json.loads(get_application_output(["speedtest", "--json", "--source", bind_address],
+                                                                 timeout=120))
         except ValueError:
             raise ParseError("Unable to decode output from Speedtest Sivel") from None
         return speedtest_result
@@ -222,3 +225,21 @@ def bytes_to_human_readable(bytes, ndigits=2, limit=None):
 
     readable_bytes = round((bytes / limit), ndigits)
     return (readable_bytes, limit, suffix)
+
+
+def get_ip_address_from_interface(interface):
+    data = json.loads(get_application_output(["ip", "-br", "--json", "addr", "show"]))
+    for datum in data:
+        if datum["ifname"] == interface:
+            for address in datum["addr_info"]:
+                ip_addr = address["local"]
+                if validate_ipv4(ip_addr):
+                    return ip_addr
+    return None
+
+
+def validate_ipv4(ip_address):
+    if re.match(r"\b((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:(?<!\.)\b|\.)){4}", ip_address):
+        return True
+    else:
+        return False

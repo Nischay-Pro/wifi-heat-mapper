@@ -1,5 +1,5 @@
 from wifi_heat_mapper.misc import TColor, check_application, process_iw, save_json, get_application_output
-from wifi_heat_mapper.misc import check_speedtest, SpeedTestMode
+from wifi_heat_mapper.misc import check_speedtest, SpeedTestMode, get_ip_address_from_interface
 from wifi_heat_mapper import __version__
 from collections import OrderedDict
 import os
@@ -228,6 +228,10 @@ def start_config(config_file):
             print("Interface {0} is not ready.".format(target_interface))
             exit(1)
 
+        bind_ip = get_ip_address_from_interface(target_interface)
+        if bind_ip is None:
+            print("Interface {0} does not have a valid IPv4 address assigned.".format(target_interface))
+
         break
 
     while True:
@@ -257,6 +261,7 @@ def start_config(config_file):
                 "backends": supported_modes,
                 "version": __version__,
                 "target_interface": target_interface,
+                "target_ip": bind_ip,
                 "ssid": ssid,
                 "speedtest": speedtest_type,
                 "benchmark_iterations": repeat_count,
