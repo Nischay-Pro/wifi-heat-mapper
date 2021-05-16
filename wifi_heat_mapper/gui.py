@@ -24,6 +24,9 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
             target_interface = get_property_from(configuration, "target_interface")
             target_ip = get_property_from(configuration, "target_ip")
             speedtest_mode = SpeedTestMode(get_property_from(configuration, "speedtest"))
+            libre_speed_server_list = get_property_from(configuration, "libre-speed-list").strip()
+            if libre_speed_server_list == "":
+                libre_speed_server_list = None
 
             connected_ssid = process_iw(target_interface)["ssid"]
             if connected_ssid != ssid:
@@ -169,7 +172,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                     benchmark_modes = get_property_from(configuration, "modes")
                     benchmark_iterations = get_property_from(configuration, "benchmark_iterations")
                     results = run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port,
-                                             speedtest_mode, target_ip)
+                                             speedtest_mode, target_ip, libre_speed_server_list)
                     results["signal_strength"] = iw["signal_strength"]
                     results["signal_quality"] = iw["signal_strength"] + 110
                     results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
@@ -309,7 +312,8 @@ def save_results_to_disk(file_path, configuration_data, benchmark_points):
     return save_json(file_path, data)
 
 
-def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode, bind_address):
+def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode, bind_address,
+                   libre_speed_server_list):
     results = defaultdict(float)
     if "base" in benchmark_modes:
         progress = (len(benchmark_modes) - 1) * benchmark_iterations
@@ -356,7 +360,8 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "speedtest" in benchmark_modes:
-            speedtest_download = run_speedtest(speedtest_mode, bind_address)
+            speedtest_download = run_speedtest(speedtest_mode, bind_address,
+                                               libre_speed_server_list=libre_speed_server_list)
             if speedtest_mode == SpeedTestMode.OOKLA:
                 results["speedtest_jitter"] += speedtest_download["ping"]["jitter"]
                 results["speedtest_latency"] += speedtest_download["ping"]["latency"]
@@ -375,6 +380,16 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
                 results["speedtest_upload_bandwidth"] += speedtest_download["upload"] / 8
                 results["speedtest_upload_size"] += speedtest_download["bytes_sent"]
                 pbar.update(1)
+
+            elif speedtest_mode == SpeedTestMode.LIBRESPEED:
+                results["speedtest_jitter"] += speedtest_download["jitter"]
+                results["speedtest_latency"] += speedtest_download["ping"]
+                results["speedtest_download_bandwidth"] += (speedtest_download["download"] * (1 << 20) / 8)
+                results["speedtest_download_size"] += speedtest_download["bytes_received"]
+                results["speedtest_upload_bandwidth"] += (speedtest_download["upload"] * (1 << 20) / 8)
+                results["speedtest_upload_size"] += speedtest_download["bytes_sent"]
+                pbar.update(1)
+    pbar.close()
 
     results = {key: value / benchmark_iterations for key, value in results.items()}
 

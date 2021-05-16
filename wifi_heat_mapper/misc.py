@@ -26,6 +26,7 @@ class SpeedTestMode(IntEnum):
     UNKNOWN = -1
     OOKLA = 0
     SIVEL = 1
+    LIBRESPEED = 2
 
 
 class suppress_stdout_stderr(object):
@@ -164,7 +165,7 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp"):
     return iperf_result.json
 
 
-def run_speedtest(mode, bind_address):
+def run_speedtest(mode, bind_address, libre_speed_server_list=None):
     if mode == SpeedTestMode.OOKLA:
         try:
             speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json", "-i", bind_address],
@@ -179,6 +180,31 @@ def run_speedtest(mode, bind_address):
         except ValueError:
             raise ParseError("Unable to decode output from Speedtest Sivel") from None
         return speedtest_result
+    elif mode == SpeedTestMode.LIBRESPEED:
+        libre_args = ["librespeed-cli", "--json", "--source", bind_address, "--mebibytes"]
+        if libre_speed_server_list is not None:
+            if not os.path.isfile((libre_speed_server_list)):
+                raise OSError("Invalid server list specified for libre office")
+            libre_speed_server_list = os.path.abspath(libre_speed_server_list)
+            libre_args += ["--local-json", libre_speed_server_list]
+        try:
+            librespeed_result = json.loads(get_application_output(libre_args, timeout=120))
+        except ValueError:
+            raise ParseError("Unable to decode output from Librespeed CLI") from None
+        return librespeed_result
+
+
+def test_libre_speed(bind_address, libre_speed_server_list=None):
+    libre_args = ["librespeed-cli", "--json", "--source", bind_address, "--no-download", "--no-upload", "--no-icmp"]
+    if not os.path.isfile((libre_speed_server_list)):
+        raise OSError("Invalid server list specified for libre office")
+    libre_speed_server_list = os.path.abspath(libre_speed_server_list)
+    libre_args += ["--local-json", libre_speed_server_list]
+    try:
+        json.loads(get_application_output(libre_args, timeout=120))
+    except ValueError:
+        return False
+    return True
 
 
 def check_speedtest():

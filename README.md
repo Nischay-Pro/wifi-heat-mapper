@@ -23,8 +23,8 @@ This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com
 
 ### Optional
 * [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) >= 1.0.0.2 (Recommended)
-or 
-* [Sivel Speedtest CLI](https://github.com/sivel/speedtest-cli) >= 2.1.3 (Jitter is not available)
+* [Sivel Speedtest CLI](https://github.com/sivel/speedtest-cli) >= 2.1.3 (Jitter is not available, Not Recommended)
+* [Librespeed CLI](https://github.com/librespeed/speedtest-cli) >= 1.0.9 (Strongly Recommended)
 
 ### Tkinter Dependency
 
@@ -82,7 +82,7 @@ By default, iperf3 will use TCP and UDP ports 5201.
 
 #### Configuration Bootstrapping
 
-Initially, you need to bootstrap your configuration specifying the graphs you would like to view, the number of times you want to repeat benchmarking, the wireless interface you will be using to profile, and the SSID configured.
+Initially, you need to bootstrap your configuration specifying the graphs you would like to view, the number of times you want to repeat benchmarking, the wireless interface you will be using to profile, and the SSID configured. In case you are using `librespeed-cli` you will be asked if you prefer it over `speedtest` and optionally provide a path to your custom libre server list.
 
 whm supports multiple graphs allowing users to select one, more, or all graphs. The tool will automatically gather the appropriate metrics to generate the graphs.
 
@@ -140,7 +140,9 @@ You will be presented with a canvas with your floor map loaded.
 
 ![GUI-3](images/gui-3.png)
 
-3. Select `Benchmark` and wait for a few seconds (or minutes) depending on the graphs you have requested and the number of times benchmarks are repeated. Once benchmarking is done, the circle's fill color changes from gray to light blue. Alternatively, if you would like to rerun benchmarking, simply select any point using the cursor; the black border becomes blue. You can now right-click and select `Benchmark` to recapture metrics.
+3. Select `Benchmark` and wait for a few seconds (or minutes) depending on the graphs you have requested and the number of times benchmarks are repeated. Once benchmarking is done, the circle's fill color changes from gray to light blue. 
+    * Benchmark results are automatically saved when they complete successfully.
+    * Alternatively, if you would like to rerun benchmarking, simply select any point using the cursor; the black border becomes blue. You can now right-click and select `Benchmark` to recapture metrics.
 
 ![GUI-4](images/gui-4.png)
 
