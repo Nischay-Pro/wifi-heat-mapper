@@ -165,10 +165,16 @@ def run_iperf(ip, port, download=True, protocol="tcp"):
 
 def run_speedtest(mode):
     if mode == SpeedTestMode.OOKLA:
-        speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"], timeout=120))
+        try:
+            speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json"], timeout=120))
+        except ValueError:
+            raise ParseError("Unable to decode output from Speedtest Ookla") from None
         return speedtest_result
     elif mode == SpeedTestMode.SIVEL:
-        speedtest_result = json.loads(get_application_output(["speedtest", "--json"], timeout=120))
+        try:
+            speedtest_result = json.loads(get_application_output(["speedtest", "--json"], timeout=120))
+        except ValueError:
+            raise ParseError("Unable to decode output from Speedtest Sivel") from None
         return speedtest_result
 
 
