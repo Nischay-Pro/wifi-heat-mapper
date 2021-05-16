@@ -149,7 +149,7 @@ def verify_iperf(ip, port):
         return False
 
 
-def run_iperf(ip, port, bind_address, download=True, protocol="tcp"):
+def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
     client = iperf3.Client()
     client.server_hostname = ip
     client.port = port
@@ -162,36 +162,53 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp"):
     client.protocol = protocol
     with suppress_stdout_stderr():
         iperf_result = client.run()
-    return iperf_result.json
+    iperf_result_json = iperf_result.json
+    try:
+        get_property_from(iperf_result_json, "start")
+        get_property_from(iperf_result_json, "end")
+    except ValueError as err:
+        if retry == 2:
+            raise err
+        else:
+            del client
+            run_iperf(ip, port, bind_address, download, protocol, retry + 1)
+    del client
+    return iperf_result_json
 
 
-def run_speedtest(mode, bind_address, libre_speed_server_list=None):
-    if mode == SpeedTestMode.OOKLA:
-        try:
-            speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json", "-i", bind_address],
-                                                                 timeout=120))
-        except ValueError:
-            raise ParseError("Unable to decode output from Speedtest Ookla") from None
-        return speedtest_result
-    elif mode == SpeedTestMode.SIVEL:
-        try:
-            speedtest_result = json.loads(get_application_output(["speedtest", "--json", "--source", bind_address],
-                                                                 timeout=120))
-        except ValueError:
-            raise ParseError("Unable to decode output from Speedtest Sivel") from None
-        return speedtest_result
-    elif mode == SpeedTestMode.LIBRESPEED:
-        libre_args = ["librespeed-cli", "--json", "--source", bind_address, "--mebibytes"]
-        if libre_speed_server_list is not None:
-            if not os.path.isfile((libre_speed_server_list)):
-                raise OSError("Invalid server list specified for libre office")
-            libre_speed_server_list = os.path.abspath(libre_speed_server_list)
-            libre_args += ["--local-json", libre_speed_server_list]
-        try:
-            librespeed_result = json.loads(get_application_output(libre_args, timeout=120))
-        except ValueError:
-            raise ParseError("Unable to decode output from Librespeed CLI") from None
-        return librespeed_result
+def run_speedtest(mode, bind_address, libre_speed_server_list=None, retry=0):
+    try:
+        if mode == SpeedTestMode.OOKLA:
+            try:
+                speedtest_result = json.loads(get_application_output(["speedtest", "-f", "json", "-i", bind_address],
+                                                                     timeout=120))
+            except ValueError:
+                raise ParseError("Unable to decode output from Speedtest Ookla") from None
+            return speedtest_result
+        elif mode == SpeedTestMode.SIVEL:
+            try:
+                speedtest_result = json.loads(get_application_output(["speedtest", "--json", "--source", bind_address],
+                                                                     timeout=120))
+            except ValueError:
+                raise ParseError("Unable to decode output from Speedtest Sivel") from None
+            return speedtest_result
+        elif mode == SpeedTestMode.LIBRESPEED:
+            libre_args = ["librespeed-cli", "--json", "--source", bind_address, "--mebibytes"]
+            if libre_speed_server_list is not None:
+                if not os.path.isfile((libre_speed_server_list)):
+                    raise OSError("Invalid server list specified for libre office")
+                libre_speed_server_list = os.path.abspath(libre_speed_server_list)
+                libre_args += ["--local-json", libre_speed_server_list]
+            try:
+                librespeed_result = json.loads(get_application_output(libre_args, timeout=120))
+            except ValueError:
+                raise ParseError("Unable to decode output from Librespeed CLI") from None
+            return librespeed_result
+    except ParseError as err:
+        if retry == 2:
+            raise err
+        else:
+            run_speedtest(mode, bind_address, libre_speed_server_list, retry + 1)
 
 
 def test_libre_speed(bind_address, libre_speed_server_list=None):
