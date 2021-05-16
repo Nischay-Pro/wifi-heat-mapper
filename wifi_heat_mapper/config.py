@@ -239,6 +239,16 @@ def start_config(config_file):
         if response in accept:
             break
 
+    while True:
+        try:
+            repeat_count = int(input("How many times do you want to repeat benchmarking? "))
+            if repeat_count <= 0:
+                raise ValueError
+        except ValueError:
+            print("Invalid value please try again.")
+        else:
+            break
+
     config_data = {
         "configuration":
             {
@@ -249,6 +259,7 @@ def start_config(config_file):
                 "target_interface": target_interface,
                 "ssid": ssid,
                 "speedtest": speedtest_type,
+                "benchmark_iterations": repeat_count,
             },
         "results": {}
     }

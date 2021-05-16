@@ -82,7 +82,7 @@ By default, iperf3 will use TCP and UDP ports 5201.
 
 #### Configuration Bootstrapping
 
-Initially, you need to bootstrap your configuration specifying the graphs you would like to view, the wireless interface you will be using to profile, and the SSID configured.
+Initially, you need to bootstrap your configuration specifying the graphs you would like to view, the number of times you want to repeat benchmarking, the wireless interface you will be using to profile, and the SSID configured.
 
 whm supports multiple graphs allowing users to select one, more, or all graphs. The tool will automatically gather the appropriate metrics to generate the graphs.
 
@@ -140,7 +140,7 @@ You will be presented with a canvas with your floor map loaded.
 
 ![GUI-3](images/gui-3.png)
 
-3. Select `Benchmark` and wait for a few seconds (10 seconds to 2 minutes) depending on the graphs you have requested. Once benchmarking is done, the circle's fill color changes from gray to light blue. Alternatively, if you would like to rerun benchmarking, simply select any point using the cursor; the black border becomes blue. You can now right-click and select `Benchmark` to recapture metrics.
+3. Select `Benchmark` and wait for a few seconds (or minutes) depending on the graphs you have requested and the number of times benchmarks are repeated. Once benchmarking is done, the circle's fill color changes from gray to light blue. Alternatively, if you would like to rerun benchmarking, simply select any point using the cursor; the black border becomes blue. You can now right-click and select `Benchmark` to recapture metrics.
 
 ![GUI-4](images/gui-4.png)
 

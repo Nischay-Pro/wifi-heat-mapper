@@ -5,6 +5,8 @@ from wifi_heat_mapper.misc import get_property_from, SpeedTestMode
 from wifi_heat_mapper.graph import generate_graph
 from PIL import Image, ImageTk
 import io
+from tqdm import tqdm
+from collections import defaultdict
 
 
 class ConfigurationError(Exception):
@@ -164,59 +166,10 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                     try:
                         print("Running benchmark")
                         results = {}
-
-                        if "tcp_r" in get_property_from(configuration, "modes"):
-                            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="tcp")
-                            results["download_bits_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"]
-                            results["download_bytes_tcp"] = iperf_download["end"]["sum_received"]["bits_per_second"] / 8
-                            results["download_bytes_data_tcp"] = iperf_download["end"]["sum_received"]["bytes"]
-                            results["download_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
-
-                        if "tcp" in get_property_from(configuration, "modes"):
-                            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="tcp")
-                            results["upload_bits_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"]
-                            results["upload_bytes_tcp"] = iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
-                            results["upload_bytes_data_tcp"] = iperf_download["end"]["sum_sent"]["bytes"]
-                            results["upload_time_tcp"] = iperf_download["start"]["test_start"]["duration"]
-
-                        if "udp_r" in get_property_from(configuration, "modes"):
-                            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="udp")
-                            results["download_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
-                            results["download_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
-                            results["download_bytes_data_udp"] = iperf_download["end"]["sum"]["bytes"]
-                            results["download_time_udp"] = iperf_download["start"]["test_start"]["duration"]
-                            results["download_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
-                            results["download_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
-                            results["download_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
-
-                        if "udp" in get_property_from(configuration, "modes"):
-                            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="udp")
-                            results["upload_bits_udp"] = iperf_download["end"]["sum"]["bits_per_second"]
-                            results["upload_bytes_udp"] = iperf_download["end"]["sum"]["bits_per_second"] / 8
-                            results["upload_bytes_data_udp"] = iperf_download["end"]["sum"]["bytes"]
-                            results["upload_time_udp"] = iperf_download["start"]["test_start"]["duration"]
-                            results["upload_jitter_udp"] = iperf_download["end"]["sum"]["jitter_ms"]
-                            results["upload_jitter_packets_udp"] = iperf_download["end"]["sum"]["packets"]
-                            results["upload_jitter_lost_packets_udp"] = iperf_download["end"]["sum"]["lost_packets"]
-
-                        if "speedtest" in get_property_from(configuration, "modes"):
-                            speedtest_download = run_speedtest(speedtest_mode)
-                            if speedtest_mode == SpeedTestMode.OOKLA:
-                                results["speedtest_jitter"] = speedtest_download["ping"]["jitter"]
-                                results["speedtest_latency"] = speedtest_download["ping"]["latency"]
-                                results["speedtest_download_bandwidth"] = speedtest_download["download"]["bandwidth"]
-                                results["speedtest_download_size"] = speedtest_download["download"]["bytes"]
-                                results["speedtest_download_elapsed_ms"] = speedtest_download["download"]["elapsed"]
-                                results["speedtest_upload_bandwidth"] = speedtest_download["upload"]["bandwidth"]
-                                results["speedtest_upload_size"] = speedtest_download["upload"]["bytes"]
-                                results["speedtest_upload_elapsed_ms"] = speedtest_download["upload"]["elapsed"]
-                            elif speedtest_mode == SpeedTestMode.SIVEL:
-                                results["speedtest_latency"] = speedtest_download["server"]["latency"]
-                                results["speedtest_download_bandwidth"] = speedtest_download["download"] / 8
-                                results["speedtest_download_size"] = speedtest_download["bytes_received"]
-                                results["speedtest_upload_bandwidth"] = speedtest_download["upload"] / 8
-                                results["speedtest_upload_size"] = speedtest_download["bytes_sent"]
-
+                        benchmark_modes = get_property_from(configuration, "modes")
+                        benchmark_iterations = get_property_from(configuration, "benchmark_iterations")
+                        results = run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port,
+                                                 speedtest_mode)
                         results["signal_strength"] = iw["signal_strength"]
                         results["signal_quality"] = iw["signal_strength"] + 110
                         results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
@@ -346,3 +299,72 @@ def get_img_data(f, maxsize=(1200, 850), first=False):
         del img
         return bio.getvalue()
     return ImageTk.PhotoImage(img)
+
+
+def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode):
+    results = defaultdict(float)
+    progress = (len(benchmark_modes) - 1) * benchmark_iterations
+    pbar = tqdm(total=progress)
+    for _ in range(benchmark_iterations):
+        if "tcp_r" in benchmark_modes:
+            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="tcp")
+            results["download_bits_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"]
+            results["download_bytes_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"] / 8
+            results["download_bytes_data_tcp"] += iperf_download["end"]["sum_received"]["bytes"]
+            results["download_time_tcp"] += iperf_download["start"]["test_start"]["duration"]
+            pbar.update(1)
+
+        if "tcp" in benchmark_modes:
+            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="tcp")
+            results["upload_bits_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"]
+            results["upload_bytes_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
+            results["upload_bytes_data_tcp"] += iperf_download["end"]["sum_sent"]["bytes"]
+            results["upload_time_tcp"] += iperf_download["start"]["test_start"]["duration"]
+            pbar.update(1)
+
+        if "udp_r" in benchmark_modes:
+            iperf_download = run_iperf(iperf_ip, iperf_port, download=True, protocol="udp")
+            results["download_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
+            results["download_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
+            results["download_bytes_data_udp"] += iperf_download["end"]["sum"]["bytes"]
+            results["download_time_udp"] += iperf_download["start"]["test_start"]["duration"]
+            results["download_jitter_udp"] += iperf_download["end"]["sum"]["jitter_ms"]
+            results["download_jitter_packets_udp"] += iperf_download["end"]["sum"]["packets"]
+            results["download_jitter_lost_packets_udp"] += iperf_download["end"]["sum"]["lost_packets"]
+            pbar.update(1)
+
+        if "udp" in benchmark_modes:
+            iperf_download = run_iperf(iperf_ip, iperf_port, download=False, protocol="udp")
+            results["upload_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
+            results["upload_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
+            results["upload_bytes_data_udp"] += iperf_download["end"]["sum"]["bytes"]
+            results["upload_time_udp"] += iperf_download["start"]["test_start"]["duration"]
+            results["upload_jitter_udp"] += iperf_download["end"]["sum"]["jitter_ms"]
+            results["upload_jitter_packets_udp"] += iperf_download["end"]["sum"]["packets"]
+            results["upload_jitter_lost_packets_udp"] += iperf_download["end"]["sum"]["lost_packets"]
+            pbar.update(1)
+
+        if "speedtest" in benchmark_modes:
+            speedtest_download = run_speedtest(speedtest_mode)
+            if speedtest_mode == SpeedTestMode.OOKLA:
+                results["speedtest_jitter"] += speedtest_download["ping"]["jitter"]
+                results["speedtest_latency"] += speedtest_download["ping"]["latency"]
+                results["speedtest_download_bandwidth"] += speedtest_download["download"]["bandwidth"]
+                results["speedtest_download_size"] += speedtest_download["download"]["bytes"]
+                results["speedtest_download_elapsed_ms"] += speedtest_download["download"]["elapsed"]
+                results["speedtest_upload_bandwidth"] += speedtest_download["upload"]["bandwidth"]
+                results["speedtest_upload_size"] += speedtest_download["upload"]["bytes"]
+                results["speedtest_upload_elapsed_ms"] += speedtest_download["upload"]["elapsed"]
+                pbar.update(1)
+
+            elif speedtest_mode == SpeedTestMode.SIVEL:
+                results["speedtest_latency"] += speedtest_download["server"]["latency"]
+                results["speedtest_download_bandwidth"] += speedtest_download["download"] / 8
+                results["speedtest_download_size"] += speedtest_download["bytes_received"]
+                results["speedtest_upload_bandwidth"] += speedtest_download["upload"] / 8
+                results["speedtest_upload_size"] += speedtest_download["bytes_sent"]
+                pbar.update(1)
+
+    results = {key: value / benchmark_iterations for key, value in results.items()}
+
+    return results
