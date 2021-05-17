@@ -28,6 +28,7 @@ class GraphPlot:
         self.reverse = reverse
 
     def process_result(self):
+        """Process the results captured for a metric. """
         processed_results = {"x": [], "y": [], "z": [], "sx": [], "sy": []}
         for result in self.results.keys():
             if self.results[result]["results"] is not None:
@@ -43,6 +44,7 @@ class GraphPlot:
         self.processed_results = processed_results
 
     def add_zero_boundary(self):
+        """Add 4 zero (vmin or vmax) benchmark points. """
         self.processed_results["x"] += [0, 0, self.floor_map_dimensions[0],
                                         self.floor_map_dimensions[0]]
         self.processed_results["y"] += [0, self.floor_map_dimensions[1],
@@ -54,6 +56,7 @@ class GraphPlot:
             self.processed_results["z"] += [self.vmin] * 4
 
     def set_floor_map_dimensions(self):
+        """Set the floor map dimensions (x, y) from image. """
         im = Image.open(self.floor_map)
         xmax, ymax = im.size
         self.floor_map_dimensions = (xmax, ymax)
@@ -65,6 +68,8 @@ class GraphPlot:
             self.vmax = max(self.processed_results["z"])
 
     def apply_conversion(self):
+        """If metric is of type bandwidth apply byte to human
+        readable size formula. """
         smallest_values = heapq.nsmallest(2, set(self.processed_results["z"]))
         smallest_value = smallest_values[0]
         if self.vmin == smallest_values[0] == 0:
@@ -84,6 +89,16 @@ class GraphPlot:
         self.vmax /= factor
 
     def generate_plot(self, levels, dpi, file_type):
+        """Generate heatmap plot from resultant metrics.
+        Args:
+            levels (int): number of countour levels.
+            dpi (int): Dots Per Inch resolution for
+            certain image types such as png.
+            file_type (str): Plot save file type.
+
+        Returns:
+            None
+        """
         self.process_result()
         self.set_floor_map_dimensions()
         self.add_zero_boundary()
@@ -131,7 +146,19 @@ class GraphPlot:
 
 
 def generate_graph(data, floor_map, levels=100, dpi=300, file_type="png"):
+    """Starting point for the plot submodule for whm.
 
+    Args:
+        data (str): the path to the configuration file.
+        floor_map (str): the path to the floor map.
+        levels (int): number of countour levels.
+        dpi (int): Dots Per Inch resolution for
+        certain image types such as png.
+        file_type (str): Plot save file type.
+
+    Returns:
+        None
+    """
     file_type = file_type.lower().replace(".", "")
     supported_formats = ["png", "pdf", "ps", "eps", "svg"]
     if file_type not in supported_formats:

@@ -76,10 +76,35 @@ class ParseError(Exception):
 
 
 def check_application(name):
+    """Check if application is available in the
+    current environment.
+
+    Args:
+        name (str): application (or executable) name.
+
+    Returns:
+        bool : True if application is available,
+        False if not available.
+    """
     return which(name) is not None
 
 
 def get_application_output(command, shell=False, timeout=None):
+    """Run a command and get the output.
+
+    Args:
+        command (str, list): The command to run
+        and it's arguments.
+        shell (bool), optional: True if executing on
+        shell, else False. Default is False.
+        timeout (int, None), optional: Set a max
+        execution time in seconds for the command.
+
+    Returns:
+        str: Command output if the command ran with
+        a zero exit code. Returns a string containing
+        the error reason in case the command failed.
+    """
     try:
         return subprocess.run(command, shell=shell, check=True, universal_newlines=True,
                               stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -93,6 +118,16 @@ def get_application_output(command, shell=False, timeout=None):
 
 
 def verify_interface(target_interface):
+    """Verify if a wireless interface exists and is
+    operational.
+
+    Args:
+        target_interface (str): The network interface to
+        verify.
+
+    Returns:
+        None
+    """
     cmd = "cat /sys/class/net/{0}/operstate".format(target_interface)
     check_interface = get_application_output(cmd, shell=True, timeout=10)
     if check_interface == "invalid":
@@ -109,7 +144,16 @@ def verify_interface(target_interface):
 
 
 def process_iw(target_interface):
+    """Get metrics from a wireless interface.
 
+    Args:
+        target_interface (str): The network interface to
+        capture metrics from.
+
+    Returns:
+        dict: A dictionary containing the metrics and
+        their values as corresponding (key, value) pairs.
+    """
     verify_interface(target_interface)
 
     try:
@@ -138,6 +182,17 @@ def process_iw(target_interface):
 
 
 def verify_iperf(ip, port):
+    """Create a socket and verify if iperf3 is running
+    on the provided ip and port.
+
+    Args:
+        ip (str): The ip address of the iperf3 server.
+        port (str): The port of the iperf3 server.
+
+    Returns:
+        bool: True if connection could be established.
+        False if it failed to establish.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
     result = sock.connect_ex((ip, port))
@@ -150,6 +205,24 @@ def verify_iperf(ip, port):
 
 
 def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
+    """Run iperf3 and return the json results.
+
+    Args:
+        ip (str): The ip address of the iperf3 server.
+        port (str): The port of the iperf3 server.
+        bind_address (str): The wireless interface ip
+        address of the client which is being used to
+        benchmark.
+        download (bool), optional: True if testing download,
+        False if testing upload. Defaults to True.
+        protocol (str), optional: 'tcp' if testing using tcp
+        protocol. 'udp' if testing using udp protocol.
+        Defaults to 'tcp'
+        retry (int), optional: The retry count.
+
+    Returns:
+        dict: Dictionary containing the iperf3 results.
+    """
     client = iperf3.Client()
     client.server_hostname = ip
     client.port = port
@@ -175,6 +248,23 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
 
 
 def run_speedtest(mode, bind_address, libre_speed_server_list=None, retry=0):
+    """Run speedtest and return the json results.
+
+    Args:
+        mode (SpeedTestMode): The speedtest backend to use
+        for benchmark.
+        bind_address (str): The wireless interface ip
+        address of the client which is being used to
+        benchmark.
+        libre_speed_server_list (str), optional: The
+        path to the librespeed server json file.
+        Default is None which forces librespeed to use
+        global list.
+        retry (int), optional: The retry count.
+
+    Returns:
+        dict: Dictionary containing the speedtest results.
+    """
     try:
         if mode == SpeedTestMode.OOKLA:
             try:
@@ -210,6 +300,19 @@ def run_speedtest(mode, bind_address, libre_speed_server_list=None, retry=0):
 
 
 def test_libre_speed(bind_address, libre_speed_server_list=None):
+    """Test user provided server list for librespeed.
+
+    Args:
+        bind_address (str): The wireless interface ip
+        address of the client which is being used to
+        benchmark.
+        libre_speed_server_list (str): The
+        path to the librespeed server json file.
+
+    Returns:
+        bool: True if librespeed works with the
+        user provided server list, otherwise False.
+    """
     libre_args = ["librespeed-cli", "--json", "--source", bind_address, "--no-download", "--no-upload", "--no-icmp"]
     if not os.path.isfile((libre_speed_server_list)):
         raise OSError("Invalid server list specified for libre office")
@@ -223,6 +326,14 @@ def test_libre_speed(bind_address, libre_speed_server_list=None):
 
 
 def check_speedtest():
+    """Detect the speedtest installed and available.
+
+    Args:
+        None
+
+    Returns:
+        class (SpeedTestMode)
+    """
     speedtest_result = get_application_output(["speedtest", "--version"], timeout=10)
     if "Speedtest by Ookla" in speedtest_result:
         return SpeedTestMode.OOKLA
@@ -232,6 +343,17 @@ def check_speedtest():
 
 
 def save_json(file_path, data):
+    """Save a json dictionary to disk.
+
+    Args:
+        file_path (str): Path to the json
+        file.
+        data (dict): json dictionary to be saved.
+
+    Returns:
+        bool: True if json dictionary was saved,
+        False otherwise.
+    """
     try:
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
@@ -241,6 +363,17 @@ def save_json(file_path, data):
 
 
 def load_json(file_path):
+    """Read a json dictionary from disk.
+
+    Args:
+        file_path (str): Path to the json
+        file.
+
+    Returns:
+        dict or bool: json dictionary
+        if file was read successfully.
+        False if it failed to read.
+    """
     try:
         with open(file_path, "r") as f:
             return json.load(f)
@@ -249,6 +382,21 @@ def load_json(file_path):
 
 
 def get_property_from(dict, key):
+    """Get a key value from a dictionary.
+
+    Args:
+        dict (dict): Dictionary to read
+        from.
+        key (str): key in the dictionary
+        to get the value for.
+
+    Returns:
+        object: Containing the value.
+
+    Raises:
+        ValueError: When key does not
+        exist in the dictionary.
+    """
     try:
         return dict[key]
     except KeyError:
@@ -256,6 +404,21 @@ def get_property_from(dict, key):
 
 
 def bytes_to_human_readable(bytes, ndigits=2, limit=None):
+    """Convert bytes to human readable format.
+
+    Args:
+        bytes (int): Size in bytes.
+        ndigits (int), optional: Number of decimal
+        places to round the human readable size to.
+        Defaults to 2.
+        limit (int), optional: Limit to a predefined
+        unit size.
+
+    Returns:
+        tuple: Tuple containing the readable bytes
+        in float, unit size in float, unit suffix
+        in str.
+    """
     if limit is None:
         for limit, suffix in HUMAN_BYTE_SIZE:
             if bytes >= limit:
@@ -269,6 +432,17 @@ def bytes_to_human_readable(bytes, ndigits=2, limit=None):
 
 
 def get_ip_address_from_interface(interface):
+    """Get the IPv4 address of an interface.
+
+    Args:
+        target_interface (str): The network interface to
+        get the ip address for.
+
+    Returns:
+        str or None: Returns the IPv4 address of the
+        interface, returns None if no IPv4 address
+        exists for that interface.
+    """
     data = json.loads(get_application_output(["ip", "-br", "--json", "addr", "show"]))
     for datum in data:
         if datum["ifname"] == interface:
@@ -280,6 +454,15 @@ def get_ip_address_from_interface(interface):
 
 
 def validate_ipv4(ip_address):
+    """Validate an IPv4 address.
+
+    Args:
+        ip_address (str): The IPv4 address to check.
+
+    Returns:
+        bool: True if a valid IPv4 address, False
+        otherwise.
+    """
     if re.match(r"\b((?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:(?<!\.)\b|\.)){4}", ip_address):
         return True
     else:

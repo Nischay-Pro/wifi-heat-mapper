@@ -14,7 +14,19 @@ class ConfigurationError(Exception):
 
 
 def start_gui(floor_map, iperf_server, config_file, output_file=None):
+    """Starting point for the benchmark submodule for whm.
 
+    Args:
+        floor_map (str): the path to the floor map image.
+        iperf_server (str): the ip address (and port)
+        for the iperf3 server.
+        config_file (str): the path to the configuration
+        file.
+        output_file (str): the path to the output file.
+
+    Returns:
+        None
+    """
     if os.path.isfile(config_file):
         config_file = os.path.abspath(config_file)
         data = load_json(config_file)
@@ -250,14 +262,54 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
 
 
 def contains(pt1, pt2):
+    """Check if tuple (x, y) of first point lies in
+    a circle contructed from the center point of
+    second point.
+
+    Args:
+        pt1 (tuple): tuple of (x, y).
+        pt2 (tuple): tuple of (x, y).
+
+    Returns:
+        bool: True or False
+    """
     return ((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2) <= 7 ** 2
 
 
 def get_point(data, index):
+    """From a given dictionary and index returns a
+    tuple (x, y).
+
+    Args:
+        data (dict): Dictionary to retrieve point
+        from.
+        index (int): Index of the point.
+
+    Returns:
+        tuple: Containing the x and y co-ordinates
+        in the form of (x, y)
+    """
     return (data[index]["position"]["x"], data[index]["position"]["y"])
 
 
 def replot(graph, benchmark_points, clear=False):
+    """Redraws the circles on the canvas from a
+    dictionary containing benchmark points.
+
+    Args:
+        graph (object): Graph object defining the UI.
+        benchmark_points (dict): Dictionary containing
+        the benchmark points.
+        clear (boolean), optional: True if you want
+        to redraw circles.
+        False if you want to delete all circles.
+
+    Returns:
+        new_benchmark_points (dict): Contaning the
+        updated indices of the benchmark points.
+        new_selection (int): New index of the selected
+        point.
+    """
     new_benchmark_point = {}
     new_selection = None
     for itm in benchmark_points.keys():
@@ -277,12 +329,34 @@ def replot(graph, benchmark_points, clear=False):
 
 
 def de_select(benchmark_points):
+    """Sets the 'selected' property for a benchmark
+    point to False.
+
+    Args:
+        benchmark_points (dict): Dictionary containing
+        the benchmark points.
+
+    Returns:
+        benchmark_points (dict): Dictionary with
+        any 'selected' attribute set to False.
+    """
     for itm in benchmark_points.keys():
         benchmark_points[itm]["selected"] = False
     return benchmark_points
 
 
 def processed_results(benchmark_points):
+    """Gets the number of benchmark points for which
+    metrics have been captured.
+
+    Args:
+        benchmark_points (dict): Dictionary containing
+        the benchmark points.
+
+    Returns:
+        results (int): Integer containing the number
+        of points for which metrics have been captured.
+    """
     results = 0
     for itm in benchmark_points.keys():
         if benchmark_points[itm]["results"] is not None:
@@ -291,8 +365,7 @@ def processed_results(benchmark_points):
 
 
 def get_img_data(f, maxsize=(1200, 850), first=False):
-    """Generate image data using PIL
-    """
+    """Generate image data using PIL"""
     img = Image.open(f)
     img.thumbnail(maxsize)
     if first:
@@ -304,6 +377,19 @@ def get_img_data(f, maxsize=(1200, 850), first=False):
 
 
 def save_results_to_disk(file_path, configuration_data, benchmark_points):
+    """Saves the results to disk.
+
+    Args:
+        file_path (str): Save path to the configuration file.
+        configuration_data (dict): Dictionary containing the
+        metrics and configuration details.
+        benchmark_points (dict): Dictionary containing
+        the benchmark points.
+
+    Returns:
+        bool: True if results have been saved to disk,
+        False otherwise.
+    """
     benchmark_points = de_select(benchmark_points)
     data = {
         "configuration": configuration_data,
@@ -314,6 +400,28 @@ def save_results_to_disk(file_path, configuration_data, benchmark_points):
 
 def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, speedtest_mode, bind_address,
                    libre_speed_server_list):
+    """Runs benchmark for a given benchmark point.
+
+    Args:
+        benchmark_modes (tuple): Tuple containing the list
+        of modes to use for benchmarking.
+        benchmark_iterations (int): Number of times to repeat
+        benchmarking.
+        iperf_ip (str): ip address of the iperf3 server.
+        iperf_port (int): port of the iperf3 server.
+        speedtest_mode (SpeedTestMode): Speedtest backend to use.
+        bind_address (str): The wireless interface ip
+        address of the client which is being used to
+        benchmark.
+        libre_speed_server_list (str), optional: The
+        path to the librespeed server json file.
+        Default is None which forces librespeed to use
+        global list.
+
+    Returns:
+        dict: Dictionary containing metrics and their values in
+        corresponding key value pairs.
+    """
     results = defaultdict(float)
     if "base" in benchmark_modes:
         progress = (len(benchmark_modes) - 1) * benchmark_iterations

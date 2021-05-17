@@ -151,6 +151,14 @@ reject = ("n", "no")
 
 
 def start_config(config_file):
+    """Starting point for the bootstrap submodule for whm.
+
+    Args:
+        config_file (str): the path to the configuration file.
+
+    Returns:
+        None
+    """
     print("Detecting benchmarking capabilities.")
     supported_modes = []
     speedtest_type = SpeedTestMode.UNKNOWN
@@ -328,12 +336,38 @@ def start_config(config_file):
 
 
 def print_graph_to_console(index, title, description):
+    """Pretty print the configuration items on the
+    terminal for the user.
+
+    Args:
+        index (int): row index number.
+        title (str): title of the graph item.
+        description (str): description of the graph
+        item.
+
+    Returns:
+        None
+    """
     print("  {0}{1}{2} {3}{4}{5}".format(TColor.GREEN, index, TColor.RESET, TColor.MAGENTA, title,
                                          TColor.RESET))
     print("        {0}".format(description))
 
 
 def ask_y_n(question):
+    """Ask a Yes or No question to user and get the
+    boolean response for it.
+
+    Args:
+        index (int): row index number.
+        title (str): title of the graph item.
+        description (str): description of the
+        graph item.
+
+    Returns:
+        bool : True if user accepts, False if
+        rejects and repeats the question if
+        invalid option.
+    """
     while True:
         response = input(question).lower()
         if response in accept:

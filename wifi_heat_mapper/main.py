@@ -7,6 +7,7 @@ from wifi_heat_mapper.graph import generate_graph
 
 
 def driver():
+    """Handles the arguments for the package."""
     parser = argparse.ArgumentParser(
         description="Generate Wi-Fi heat maps")
     subparsers = parser.add_subparsers(dest="mode")
@@ -80,4 +81,5 @@ def driver():
 
 
 def print_version():
+    """Prints the version of the package."""
     print(__version__)
