@@ -24,7 +24,7 @@ def driver():
         "--map", "-m", dest="floor_map", required=True, default=None,
         help="Image path to floor map")
     benchmark.add_argument(
-        "--server", "-s", dest="iperf_server", required=True, default=None,
+        "--server", "-s", dest="iperf_server", required=False, default=None,
         help="IP (and port) address of the iperf3 server")
     benchmark.add_argument(
         "--config", "-c", dest="config_file", required=True, default=None,

@@ -54,12 +54,16 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
     else:
         raise ConfigurationError("Missing configuration file")
 
-    if ":" in iperf_server:
-        iperf_ip = iperf_server.split(":")[0]
-        iperf_port = iperf_server.split(":")[1]
-    else:
-        iperf_ip = iperf_server
-        iperf_port = 5201
+    iperf_ip = iperf_server
+    iperf_port = 5201
+
+    if iperf_server is not None:
+        if ":" in iperf_server:
+            iperf_ip = iperf_server.split(":")[0]
+            iperf_port = iperf_server.split(":")[1]
+        else:
+            iperf_ip = iperf_server
+            iperf_port = 5201
 
     print("Loaded configuration file from: {0}".format(config_file))
     print("Target Interface: {0} and SSID: {1}".format(target_interface, ssid))
@@ -111,7 +115,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
         print("Restoring previous benchmark points [{0}]".format(benchmark_count))
         benchmark_points, current_selection = replot(graph, benchmark_points)
 
-    if "iperf3" in configuration["backends"] and not verify_iperf(iperf_ip, iperf_port):
+    if "iperf3" in configuration["modes"] and not verify_iperf(iperf_ip, iperf_port):
         print("Could not connect to iperf3 server.")
         sg.popup_error("Could not connect to iperf3 server.")
         exit(1)
