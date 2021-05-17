@@ -177,12 +177,7 @@ Supported options include (png, pdf, ps, eps, svg)
 The directory from which the user has run the command will contain the graphs that the user requested during bootstrap.
 
 ## Examples
-
-### Floor map
-![GUI-1](images/gui-1.png)
-
-## Floor map with benchmark points
-![GUI-5](images/gui-5.png)
+A sample configuration, including benchmark results and plots generated is provided in the [examples](examples/SAMPLE.md) folder.
 
 
 
