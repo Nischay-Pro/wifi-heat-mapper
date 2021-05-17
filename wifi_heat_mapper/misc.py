@@ -170,9 +170,7 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
         if retry == 2:
             raise err
         else:
-            del client
             run_iperf(ip, port, bind_address, download, protocol, retry + 1)
-    del client
     return iperf_result_json
 
 

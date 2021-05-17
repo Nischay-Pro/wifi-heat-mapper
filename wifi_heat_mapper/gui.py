@@ -175,7 +175,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                                              speedtest_mode, target_ip, libre_speed_server_list)
                     results["signal_strength"] = iw["signal_strength"]
                     results["signal_quality"] = iw["signal_strength"] + 110
-                    results["signal_quality_percent"] = (iw["signal_strength"] + 110) * (10 / 7)
+                    results["signal_quality_percent"] = min((iw["signal_strength"] + 110) * (10 / 7), 100)
                     results["channel"] = iw["channel"]
                     results["channel_frequency"] = iw["channel_frequency"]
                     benchmark_points[current_selection]["results"] = results
