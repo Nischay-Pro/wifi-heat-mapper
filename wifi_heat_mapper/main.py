@@ -4,22 +4,28 @@ from wifi_heat_mapper.gui import start_gui
 from wifi_heat_mapper import __version__
 from wifi_heat_mapper.config import start_config
 from wifi_heat_mapper.graph import generate_graph
+import logging
 
 
 def driver():
     """Handles the arguments for the package."""
     parser = argparse.ArgumentParser(
         description="Generate Wi-Fi heat maps")
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument(
+        "--debug", action="store_true", dest="debug_mode",
+        help="print debug statements"
+    )
     subparsers = parser.add_subparsers(dest="mode")
     bootstrap = subparsers.add_parser(
         "bootstrap", description="Run the bootstrap configuration generator",
-        help="Run the bootstrap configuration generator")
+        help="Run the bootstrap configuration generator", parents=[parent_parser])
     bootstrap.add_argument(
         "--config", "-c", dest="config_file", required=False, default="config.json",
         help="Save path for configuration file")
     benchmark = subparsers.add_parser(
         "benchmark", description="Run benchmarks to gather metrics",
-        help="Start running benchmarks to gather metrics")
+        help="Start running benchmarks to gather metrics", parents=[parent_parser])
     benchmark.add_argument(
         "--map", "-m", dest="floor_map", required=True, default=None,
         help="Image path to floor map")
@@ -31,7 +37,7 @@ def driver():
         help="Path to configuration file")
     plot = subparsers.add_parser(
         "plot", description="Generate plots from metrics",
-        help="Generate plots from metrics")
+        help="Generate plots from metrics", parents=[parent_parser])
     plot.add_argument(
         "--config", "-c", dest="config_file", required=True, default=None,
         help="Path to configuration file")
@@ -55,6 +61,7 @@ def driver():
         help="Show this help message and exit")
     parser.add_argument(
         "-V", "--version", action="store_true", help="show version number and exit")
+
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
@@ -64,6 +71,11 @@ def driver():
     if args.version:
         print_version()
         exit()
+
+    if args.debug_mode:
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s",
+                            datefmt="%d-%b-%y %H:%M:%S", filename="debug.log")
+        logging.debug("Enabled debug mode")
 
     if args.mode == "bootstrap":
         start_config(args.config_file)

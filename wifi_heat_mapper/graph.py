@@ -1,13 +1,15 @@
+from wifi_heat_mapper.config import ConfigurationOptions
+from wifi_heat_mapper.misc import load_json, get_property_from, bytes_to_human_readable
+from wifi_heat_mapper.debugger import log_arguments
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.pyplot import imread
 from scipy.interpolate import Rbf
 from tqdm import tqdm
-from wifi_heat_mapper.config import ConfigurationOptions
-from wifi_heat_mapper.misc import load_json, get_property_from, bytes_to_human_readable
 import os
 import heapq
+import logging
 
 
 class MissingMetricError(Exception):
@@ -145,6 +147,7 @@ class GraphPlot:
         plt.savefig(file_name, format=file_type, dpi=dpi)
 
 
+@log_arguments
 def generate_graph(data, floor_map, levels=100, dpi=300, file_type="png"):
     """Starting point for the plot submodule for whm.
 
@@ -181,8 +184,11 @@ def generate_graph(data, floor_map, levels=100, dpi=300, file_type="png"):
             vmin = graph_modes[key_name]["vmin"]
         if "vmax" in graph_modes[key_name]:
             vmax = graph_modes[key_name]["vmax"]
+        logging.debug("Generating plot for {0} with (vmin, vmax) = ({1}, {2})".format(key_name, vmin, vmax))
         GraphPlot(benchmark_results, key_name, floor_map, vmin=vmin, vmax=vmax,
                   conversion=graph_modes[key_name]["conversion"],
                   reverse=graph_modes[key_name]["reverse"])\
             .generate_plot(levels=levels, dpi=dpi, file_type=file_type)
+        logging.debug("Finished generating plot")
     print("Finished plotting.")
+    logging.debug("Finished plotting")

@@ -3,10 +3,12 @@ import os.path
 from wifi_heat_mapper.misc import run_iperf, run_speedtest, process_iw, load_json, save_json, verify_iperf
 from wifi_heat_mapper.misc import get_property_from, SpeedTestMode
 from wifi_heat_mapper.graph import generate_graph
+from wifi_heat_mapper.debugger import log_arguments
 from PIL import Image, ImageTk
 import io
 from tqdm import tqdm
 from collections import defaultdict
+import logging
 
 
 class ConfigurationError(Exception):
@@ -16,6 +18,7 @@ class ConfigurationError(Exception):
 iperf3_modes = ["tcp", "tcp_r", "udp", "udp_r"]
 
 
+@log_arguments
 def start_gui(floor_map, iperf_server, config_file, output_file=None):
     """Starting point for the benchmark submodule for whm.
 
@@ -35,6 +38,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
         data = load_json(config_file)
         if data is not False:
             configuration = get_property_from(data, "configuration")
+            logging.debug("Configuration Loaded: {0}".format(configuration))
             ssid = get_property_from(configuration, "ssid")
             target_interface = get_property_from(configuration, "target_interface")
             target_ip = get_property_from(configuration, "target_ip")
@@ -44,6 +48,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                 libre_speed_server_list = None
 
             connected_ssid = process_iw(target_interface)["ssid"]
+            logging.debug("SSID Connected: {0}".format(connected_ssid))
             if connected_ssid != ssid:
                 print("Configuration file is for {0} but user connected to {1}"
                       .format(ssid, connected_ssid))
@@ -80,9 +85,12 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
     right_click_items = ["Items", ["&Benchmark", "&Delete", "&Mark/Un-Mark as Station"]]
 
     print("Loading floor map")
+    logging.info("Loading floor map: {0}".format(floor_map))
 
     im = Image.open(floor_map)
     canvas_size = (im.size[0], im.size[1])
+
+    logging.info("Loaded floor map with dims: {0}".format(canvas_size))
 
     output_path_index = sg.InputText(visible=False, enable_events=True, key='output_path')
     layout = [
@@ -112,7 +120,10 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
         output_path_index.update(output_file)
 
     graph = window.Element("Floor Map")
+
+    logging.info("Drawing on canvas")
     graph.DrawImage(data=get_img_data(floor_map, first=True), location=(0, canvas_size[1]))
+    logging.info("Updated canvas")
 
     print("Loaded floor map")
 
@@ -120,6 +131,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
 
     current_selection = None
     benchmark_count = len(benchmark_points.keys())
+    logging.debug("Benchmarking Points detected from previous run(s): {0}".format(benchmark_count))
     if benchmark_count != 0:
         print("Restoring previous benchmark points [{0}]".format(benchmark_count))
         benchmark_points, current_selection = replot(graph, benchmark_points)
@@ -191,7 +203,9 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                 if iw["ssid"] != ssid:
                     sg.popup_error("SSID mismatch!")
                     print("SSID mismatch!")
+                    logging.error("SSID mismatched. Config: {0} | User: {1}".format(ssid, iw["ssid"]))
                 else:
+                    logging.info("Running benchmark")
                     print("Running benchmark")
                     results = {}
                     benchmark_modes = get_property_from(configuration, "modes")
@@ -209,8 +223,10 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                     benchmark_points, current_selection = replot(graph, benchmark_points)
 
                     print("Completed benchmark.")
+                    logging.info("Completed benchmark")
                     if not save_results_to_disk(output_file, configuration, benchmark_points):
                         print("Unable to save to disk")
+                        logging.warning("Unable to save to disk.")
             else:
                 print("Please select a benchmark point.")
                 sg.popup_error("Please select a benchmark point.")
@@ -237,6 +253,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
                 else:
                     print("Unable to save to disk")
                     sg.popup_error("Unable to save to disk!")
+                    logging.error("Unable to save to disk")
 
         if event == "Save Results":
             benchmark_points = de_select(benchmark_points)
@@ -250,6 +267,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
             else:
                 print("Unable to save to disk")
                 sg.popup_error("Unable to save to disk!")
+                logging.error("Unable to save to disk")
 
         if event == "Plot":
             valid_benchmark_points = processed_results(benchmark_points)
@@ -263,6 +281,7 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
 
         if event == "Clear All":
             benchmark_points, current_selection = replot(graph, benchmark_points, clear=True)
+            logging.error("Wiped all benchmark points")
 
     window.close()
 
@@ -443,6 +462,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
     pbar = tqdm(total=progress)
     for _ in range(benchmark_iterations):
         if "tcp_r" in benchmark_modes:
+            logging.debug("Running iperf3 in tcp_r mode")
             iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=True, protocol="tcp")
             results["download_bits_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"]
             results["download_bytes_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"] / 8
@@ -451,6 +471,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "tcp" in benchmark_modes:
+            logging.debug("Running iperf3 in tcp mode")
             iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=False, protocol="tcp")
             results["upload_bits_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"]
             results["upload_bytes_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
@@ -459,6 +480,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "udp_r" in benchmark_modes:
+            logging.debug("Running iperf3 in udp_r mode")
             iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=True, protocol="udp")
             results["download_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
             results["download_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
@@ -470,6 +492,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "udp" in benchmark_modes:
+            logging.debug("Running iperf3 in udp mode")
             iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=False, protocol="udp")
             results["upload_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
             results["upload_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
@@ -481,6 +504,7 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
             pbar.update(1)
 
         if "speedtest" in benchmark_modes:
+            logging.debug("Running speedtest enum value: {0}".format(speedtest_mode))
             speedtest_download = run_speedtest(speedtest_mode, bind_address,
                                                libre_speed_server_list=libre_speed_server_list)
             if speedtest_mode == SpeedTestMode.OOKLA:

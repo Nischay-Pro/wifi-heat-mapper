@@ -1,3 +1,4 @@
+from wifi_heat_mapper.debugger import log_arguments
 import subprocess
 from shutil import which
 import re
@@ -7,6 +8,7 @@ import iperf3
 import importlib
 from enum import IntEnum
 import os
+import logging
 
 
 class TColor:
@@ -72,6 +74,10 @@ HUMAN_BYTE_SIZE = [
 
 
 class ParseError(Exception):
+    pass
+
+
+class ExternalError(Exception):
     pass
 
 
@@ -204,6 +210,7 @@ def verify_iperf(ip, port):
         return False
 
 
+@log_arguments
 def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
     """Run iperf3 and return the json results.
 
@@ -237,16 +244,21 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
         iperf_result = client.run()
     iperf_result_json = iperf_result.json
     try:
-        get_property_from(iperf_result_json, "start")
+        get_property_from(iperf_result_json, "error")
         get_property_from(iperf_result_json, "end")
-    except ValueError as err:
+    except ValueError:
+        logging.error("Output from iperf3 : {0}".format(iperf_result_json))
+        logging.exception("Unable to parse iperf3 result")
         if retry == 2:
-            raise err
+            raise ExternalError("External Error generated from iperf3: {0}".format(iperf_result_json["error"])) from\
+                  None
         else:
+            logging.warning("Rerunning iperf3 with retry count {0}".format(retry + 1))
             run_iperf(ip, port, bind_address, download, protocol, retry + 1)
     return iperf_result_json
 
 
+@log_arguments
 def run_speedtest(mode, bind_address, libre_speed_server_list=None, retry=0):
     """Run speedtest and return the json results.
 
@@ -287,18 +299,22 @@ def run_speedtest(mode, bind_address, libre_speed_server_list=None, retry=0):
                     raise OSError("Invalid server list specified for libre office")
                 libre_speed_server_list = os.path.abspath(libre_speed_server_list)
                 libre_args += ["--local-json", libre_speed_server_list]
+                logging.debug("Libre Args: {0}".format(libre_args))
             try:
                 librespeed_result = json.loads(get_application_output(libre_args, timeout=120))
             except ValueError:
                 raise ParseError("Unable to decode output from Librespeed CLI") from None
             return librespeed_result
     except ParseError as err:
+        logging.exception("Parse Error has occured.")
         if retry == 2:
             raise err
         else:
+            logging.warning("Rerunning Speedtest with retry count {0}".format(retry + 1))
             run_speedtest(mode, bind_address, libre_speed_server_list, retry + 1)
 
 
+@log_arguments
 def test_libre_speed(bind_address, libre_speed_server_list=None):
     """Test user provided server list for librespeed.
 
@@ -318,6 +334,7 @@ def test_libre_speed(bind_address, libre_speed_server_list=None):
         raise OSError("Invalid server list specified for libre office")
     libre_speed_server_list = os.path.abspath(libre_speed_server_list)
     libre_args += ["--local-json", libre_speed_server_list]
+    logging.debug("Libre Args: {0}".format(libre_args))
     try:
         json.loads(get_application_output(libre_args, timeout=120))
     except ValueError:

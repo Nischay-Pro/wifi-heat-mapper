@@ -1,9 +1,11 @@
 from wifi_heat_mapper.misc import TColor, check_application, process_iw, save_json, get_application_output
 from wifi_heat_mapper.misc import check_speedtest, SpeedTestMode, get_ip_address_from_interface, test_libre_speed
+from wifi_heat_mapper.debugger import log_arguments
 from wifi_heat_mapper import __version__
 from collections import OrderedDict
 import os
 import pathlib
+import logging
 
 
 class ConfigurationOptions:
@@ -150,6 +152,7 @@ accept = ("y", "yes")
 reject = ("n", "no")
 
 
+@log_arguments
 def start_config(config_file):
     """Starting point for the bootstrap submodule for whm.
 
@@ -173,6 +176,8 @@ def start_config(config_file):
     if check_application("librespeed-cli"):
         supported_modes.append("librespeed-cli")
 
+    logging.debug("System supports: {0}".format(str(supported_modes)))
+
     if len(supported_modes) == 0:
         print("Could not detect any supported mode [iperf3, speedtest or librespeed-cli].")
         exit(1)
@@ -186,6 +191,7 @@ def start_config(config_file):
     if not check_application("iw"):
         print("Could not detect iw (Wireless tools for Linux)")
         exit(1)
+    logging.debug("Detected iw")
 
     while True:
         target_interface = input("Please enter the target wireless interface to run benchmark on (example: wlan0): ")
@@ -208,9 +214,13 @@ def start_config(config_file):
             print("Interface {0} is not ready.".format(target_interface))
             exit(1)
 
+        logging.debug("Target Interface: {0}".format(target_interface))
+
         bind_ip = get_ip_address_from_interface(target_interface)
         if bind_ip is None:
             print("Interface {0} does not have a valid IPv4 address assigned.".format(target_interface))
+
+        logging.debug("Target Interface IP Address: {0}".format(bind_ip))
 
         break
 
@@ -219,6 +229,7 @@ def start_config(config_file):
         question = "You are connected to {0}{1}{2}. Is this the interface you want to benchmark on? (y/N) ".format(
                    TColor.BLUE, ssid, TColor.RESET)
         if ask_y_n(question):
+            logging.debug("SSID: {0}".format(ssid))
             break
 
     while True:
@@ -229,12 +240,15 @@ def start_config(config_file):
         except ValueError:
             print("Invalid value please try again.")
         else:
+            logging.debug("Benchmark Iterations: {0}".format(repeat_count))
             break
 
     if "librespeed-cli" in supported_modes and speedtest_type != SpeedTestMode.UNKNOWN:
         question = "We detected librespeed-cli. Do you prefer librespeed over speedtest? (y/N) "
         if ask_y_n(question):
             speedtest_type = SpeedTestMode.LIBRESPEED
+
+    logging.debug("SpeedTest Mode: {0}".format(speedtest_type))
 
     if speedtest_type == SpeedTestMode.LIBRESPEED:
         question = "Do you have a custom librespeed server list you would like to use? (y/N) "
@@ -254,6 +268,8 @@ def start_config(config_file):
                     print("Invalid file. Please try again.")
         else:
             print("Using official list.")
+
+    logging.debug("Custom Librespeed List: {0}".format(libre_speed_list))
 
     print("Supported Graphs:")
     configuration_dict = ConfigurationOptions.configuration
@@ -327,6 +343,9 @@ def start_config(config_file):
     }
 
     config_file = os.path.abspath(config_file)
+
+    logging.debug("Configuration Data: {0}".format(config_data))
+    logging.debug("Configuration Save Path: {0}".format(config_file))
 
     if pathlib.Path(config_file).suffix != ".json":
         config_file += ".json"
