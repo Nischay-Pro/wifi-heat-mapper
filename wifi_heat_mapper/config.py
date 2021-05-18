@@ -257,12 +257,14 @@ def start_config(config_file):
 
     print("Supported Graphs:")
     configuration_dict = ConfigurationOptions.configuration
+    configuration_dict_supported = []
     supported_modes.append("base")
     i = 1
     for itm in configuration_dict.keys():
         mode = configuration_dict[itm]["mode"]
         supported = set(mode).intersection(set(supported_modes))
         if supported:
+            configuration_dict_supported.append(itm)
             print_graph_to_console(i, itm, configuration_dict[itm]["description"])
             i += 1
 
@@ -273,10 +275,9 @@ def start_config(config_file):
     graph_key = []
 
     if response == "all":
-        for itm in configuration_dict.keys():
+        for itm in configuration_dict_supported:
             selection += configuration_dict[itm]["requirements"]
-        keys = tuple(range(1, len(configuration_dict.keys()) + 1))
-        graph_key = tuple(configuration_dict.keys())
+        graph_key = tuple(configuration_dict_supported)
 
     elif len(response) > 0:
         keys = []

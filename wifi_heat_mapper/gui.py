@@ -13,6 +13,9 @@ class ConfigurationError(Exception):
     pass
 
 
+iperf3_modes = ["tcp", "tcp_r", "udp", "udp_r"]
+
+
 def start_gui(floor_map, iperf_server, config_file, output_file=None):
     """Starting point for the benchmark submodule for whm.
 
@@ -53,6 +56,12 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
 
     else:
         raise ConfigurationError("Missing configuration file")
+
+    modes = get_property_from(configuration, "modes")
+
+    if len(set(iperf3_modes).intersection(set(modes))) > 0 and iperf_server is None:
+        print("Please specify your iperf3 server IP address.")
+        exit(1)
 
     iperf_ip = iperf_server
     iperf_port = 5201
