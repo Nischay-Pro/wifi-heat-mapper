@@ -244,7 +244,7 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
         iperf_result = client.run()
     iperf_result_json = iperf_result.json
     try:
-        get_property_from(iperf_result_json, "error")
+        get_property_from(iperf_result_json, "start")
         get_property_from(iperf_result_json, "end")
     except ValueError:
         logging.error("Output from iperf3 : {0}".format(iperf_result_json))
