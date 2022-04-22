@@ -173,7 +173,10 @@ def process_iw(target_interface):
 
         results = {}
         results["interface"] = re.findall(r"(?<=Interface )(.*)", iw_info)[0]
-        results["interface_mac"] = re.findall(r"([0-9a-fA-F]{2}[:]){5}([0-9a-fA-F]{2})", iw_info)[0]
+        results["interface_mac"] = re.findall(r"(?<=addr )(.*)", iw_info)[0]
+        if not verify_mac(results["interface_mac"]):
+            print("The interface {0} has an invalid MAC address".format(target_interface))
+            exit(1)
         tmp = re.findall(r"(?<=channel )(.*?)(?=\,)", iw_info)[0].split(" ")
         results["channel"] = int(tmp[0])
         results["channel_frequency"] = int(tmp[1].replace("(", ""))
@@ -181,10 +184,34 @@ def process_iw(target_interface):
         iw_info = get_application_output(["iw {0} station dump".format(target_interface)],
                                          shell=True, timeout=10).replace("\t", " ")
         results["ssid_mac"] = re.findall(r"(?<=Station )(.*)(?= \()", iw_info)[0]
-        results["signal_strength"] = int(re.findall(r"(?<=signal avg: )(.*)", iw_info)[0].split(" ")[0])
+        if not verify_mac(results["ssid_mac"]):
+            print("The station {0} has an invalid MAC address".format(results["ssid"]))
+            exit(1)
+        try:
+            results["signal_strength"] = int(re.findall(r"(?<=signal avg: )(.*)", iw_info)[0].split(" ")[0])
+        except IndexError:
+            # Use fallback iwconfig command. This is not ideal. Need to rewrite this entire portion targeting nl80211
+            iwconfig = get_application_output(["iwconfig {0}".format(target_interface)])
+            results["signal_strength"] = int(re.findall(r"(?<=Signal level=)(.*)(?= dBm)", iwconfig)[0])
     except IndexError:
         raise ParseError("Unable to parse iw.") from None
     return results
+
+
+def verify_mac(mac):
+    """Verify if a MAC address is valid.
+
+    Args:
+        mac (str): The MAC address to verify.
+
+    Returns:
+        bool: True if the MAC address is valid,
+        False if not.
+    """
+    if re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", mac):
+        return True
+    else:
+        return False
 
 
 def verify_iperf(ip, port):
@@ -236,7 +263,6 @@ def run_iperf(ip, port, bind_address, download=True, protocol="tcp", retry=0):
     client.bind_address = bind_address
     client.reverse = False
     client.verbose = False
-    client._errno
     if download:
         client.reverse = True
     client.protocol = protocol

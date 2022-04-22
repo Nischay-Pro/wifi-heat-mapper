@@ -2,7 +2,7 @@
 
 ## whm aka wifi-heat-mapper
 
-whm also known as `wifi-heat-mapper` is a Python library for benchmarking Wi-Fi networks and gather useful metrics that can be converted into meaningful easy-to-understand heatmaps. The tool aims to assist network engineers, admins and homelabbers in figuring out the performance of their Access Points and Routers.
+whm also known as `wifi-heat-mapper` is a Python library for benchmarking Wi-Fi networks and gather useful metrics that can be converted into meaningful easy-to-understand heatmaps. The tool aims to assist network engineers, admins and homelabbers in figuring out the performance of their Access Points and Routers. While this tool may help in giving a general idea of your WiFi performance, the tool is not meant to be comprehensive.
 
 This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com/jantman/python-wifi-survey-heatmap) by [Jason Antman](www.jasonantman.com).
 
