@@ -180,7 +180,22 @@ def process_iw(target_interface):
         tmp = re.findall(r"(?<=channel )(.*?)(?=\,)", iw_info)[0].split(" ")
         results["channel"] = int(tmp[0])
         results["channel_frequency"] = int(tmp[1].replace("(", ""))
-        results["ssid"] = re.findall(r"(?<=ssid )(.*)", iw_info)[0]
+
+        try: 
+            results["ssid"] = re.findall(r"(?<=ssid )(.*)", iw_info)[0]
+        except IndexError: 
+            print("iw {0} info command cannot find required SSID. Trying iw {0} link".format(target_interface))
+
+            iw_link = get_application_output(
+                ["iw {0} link".format(target_interface)],
+                shell=True, timeout=10).replace("\t", " ")
+
+            if iw_link == "invalid":
+                print("iw {0} link command failed.".format(target_interface))
+                exit(1)
+
+            results["ssid"] = re.findall(r"(?<=SSID: )(.*)", iw_link)[0]
+
         iw_info = get_application_output(["iw {0} station dump".format(target_interface)],
                                          shell=True, timeout=10).replace("\t", " ")
         results["ssid_mac"] = re.findall(r"(?<=Station )(.*)(?= \()", iw_info)[0]
