@@ -396,10 +396,9 @@ def processed_results(benchmark_points):
     return results
 
 
-def get_img_data(f, maxsize=(1200, 850), first=False):
+def get_img_data(f, first=False):
     """Generate image data using PIL"""
     img = Image.open(f)
-    img.thumbnail(maxsize)
     if first:
         bio = io.BytesIO()
         img.save(bio, format="PNG")
