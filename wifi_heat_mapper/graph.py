@@ -107,11 +107,9 @@ class GraphPlot:
         if self.conversion:
             self.apply_conversion()
 
-        minimum = 0
-        maximum = max(self.floor_map_dimensions)
-
-        xi = np.linspace(minimum, maximum, 100)
-        yi = np.linspace(minimum, maximum, 100)
+        fdimx, fdimy = self.floor_map_dimensions
+        xi = np.linspace(0, fdimx, 100)
+        yi = np.linspace(0, fdimy, 100)
 
         xi, yi = np.meshgrid(xi, yi)
         di = Rbf(self.processed_results["x"], self.processed_results["y"],
@@ -120,7 +118,7 @@ class GraphPlot:
         zi[zi < self.vmin] = self.vmin
         zi[zi > self.vmax] = self.vmax
 
-        fig, ax = plt.subplots(1, 1)
+        fig, ax = plt.subplots(1, 1, figsize=(fdimx / 100, fdimy / 100))
 
         bench_plot = ax.contourf(xi, yi, zi, cmap="RdYlBu_r", vmin=self.vmin, vmax=self.vmax,
                                  alpha=0.5, zorder=150, antialiased=True, levels=levels)
