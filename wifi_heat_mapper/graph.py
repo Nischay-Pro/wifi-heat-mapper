@@ -124,18 +124,20 @@ class GraphPlot:
         bench_plot = ax.contourf(xi, yi, zi, cmap="RdYlBu_r", vmin=self.vmin, vmax=self.vmax,
                                  alpha=0.5, zorder=150, antialiased=True, levels=levels)
 
+        fdim_coef = math.sqrt(fdimx * fdimy)
+        marker_size = max(4, fdim_coef // 210) 
         ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o',
-                markeredgecolor='black', markeredgewidth=0.5, linestyle='None', markersize=5,
+                markeredgecolor='black', markeredgewidth=0.5, linestyle='None', markersize=marker_size,
                 label="Benchmark Point")
 
         ax.plot(self.processed_results["sx"], self.processed_results["sy"], zorder=250, marker='o',
                 markeredgecolor='black', markerfacecolor="orange", markeredgewidth=0.5,
-                linestyle='None', markersize=5, label="Base Station")
+                linestyle='None', markersize=marker_size, label="Base Station")
 
         ax.imshow(imread(self.floor_map)[::-1], interpolation='bicubic', zorder=1, alpha=1,
                   origin="lower")
 
-        title_size = max(10, math.sqrt(fdimx * fdimy) // 70)
+        title_size = max(10, fdim_coef // 70)
         label_size = max(7, title_size - 5)
 
         cb = fig.colorbar(bench_plot)
