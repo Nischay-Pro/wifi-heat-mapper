@@ -4,6 +4,7 @@ from wifi_heat_mapper.debugger import log_arguments
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 from matplotlib.pyplot import imread
 from scipy.interpolate import Rbf
 from tqdm import tqdm
@@ -134,13 +135,23 @@ class GraphPlot:
         ax.imshow(imread(self.floor_map)[::-1], interpolation='bicubic', zorder=1, alpha=1,
                   origin="lower")
 
-        fig.colorbar(bench_plot)
+        title_size = max(10, math.sqrt(fdimx * fdimy) // 70)
+        label_size = max(7, title_size - 5)
+
+        cb = fig.colorbar(bench_plot)
+        cb.ax.tick_params(labelsize=label_size)
         desc = ConfigurationOptions.configuration[self.key]["description"]
         if self.suffix is not None:
             desc = desc.format(self.suffix)
-        plt.title("{0}".format(desc))
+
+        plt.title("{0}".format(desc), fontsize=title_size)
         plt.axis('off')
-        plt.legend(bbox_to_anchor=(0.55, -0.05), ncol=2)
+        plt.legend(
+            loc='upper center', 
+            bbox_to_anchor=(0.5, -0.05), 
+            ncol=2, 
+            prop={"size": label_size}
+        )
         file_name = "{0}.{1}".format(self.key, file_type)
         plt.savefig(file_name, format=file_type, dpi=dpi)
 
