@@ -181,9 +181,9 @@ def process_iw(target_interface):
         results["channel"] = int(tmp[0])
         results["channel_frequency"] = int(tmp[1].replace("(", ""))
 
-        try: 
+        try:
             results["ssid"] = re.findall(r"(?<=ssid )(.*)", iw_info)[0]
-        except IndexError: 
+        except IndexError:
             print("iw {0} info command cannot find required SSID. Trying iw {0} link".format(target_interface))
 
             iw_link = get_application_output(
