@@ -125,7 +125,7 @@ class GraphPlot:
                                  alpha=0.5, zorder=150, antialiased=True, levels=levels)
 
         fdim_coef = math.sqrt(fdimx * fdimy)
-        marker_size = max(4, fdim_coef // 210) 
+        marker_size = max(4, fdim_coef // 210)
         ax.plot(self.processed_results["x"], self.processed_results["y"], zorder=200, marker='o',
                 markeredgecolor='black', markeredgewidth=0.5, linestyle='None', markersize=marker_size,
                 label="Benchmark Point")
@@ -149,9 +149,9 @@ class GraphPlot:
         plt.title("{0}".format(desc), fontsize=title_size)
         plt.axis('off')
         plt.legend(
-            loc='upper center', 
-            bbox_to_anchor=(0.5, -0.05), 
-            ncol=2, 
+            loc='upper center',
+            bbox_to_anchor=(0.5, -0.05),
+            ncol=2,
             prop={"size": label_size}
         )
         file_name = "{0}.{1}".format(self.key, file_type)
