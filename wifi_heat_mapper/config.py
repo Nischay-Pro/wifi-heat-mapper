@@ -1,9 +1,10 @@
-from wifi_heat_mapper.misc import TColor, check_application, process_iw, save_json, get_application_output
+from wifi_heat_mapper.misc import TColor, check_application, process_airport, process_iw, save_json, get_application_output
 from wifi_heat_mapper.misc import check_speedtest, SpeedTestMode, get_ip_address_from_interface, test_libre_speed
 from wifi_heat_mapper.debugger import log_arguments
 from wifi_heat_mapper import __version__
 from collections import OrderedDict
 import os
+import platform
 import pathlib
 import logging
 
@@ -188,10 +189,23 @@ def start_config(config_file):
     target_interface = None
     libre_speed_list = ""
 
-    if not check_application("iw"):
-        print("Could not detect iw (Wireless tools for Linux)")
+    system = platform.system()
+
+    if system == "Darwin":
+        if not check_application(
+            "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport"
+        ):
+            print("Could not detect airport (Wireless tools for macOS)")
+            exit(1)
+        logging.debug("Detected airport")
+    elif system == "Linux":
+        if not check_application("iw"):
+            print("Could not detect iw (Wireless tools for Linux)")
+            exit(1)
+        logging.debug("Detected iw")
+    else:
+        print("Unsupported operating system {0}".format(system))
         exit(1)
-    logging.debug("Detected iw")
 
     while True:
         target_interface = input("Please enter the target wireless interface to run benchmark on (example: wlan0): ")
@@ -199,33 +213,54 @@ def start_config(config_file):
         if not target_interface.isalnum():
             print("Invalid interface")
             exit(1)
-        cmd = "cat /sys/class/net/{0}/operstate".format(target_interface)
-        check_interface = get_application_output(cmd, shell=True, timeout=10)
-        if check_interface == "invalid":
-            print("Interface {0} does not exist!".format(target_interface))
-            exit(1)
 
-        elif check_interface == "timeout":
-            print("Unable to get interface {0} status".format(target_interface))
-            exit(1)
+        if system == "Darwin":
+            results = process_airport(target_interface)
 
-        check_interface = check_interface.split("\n")[0]
-        if check_interface != "up":
-            print("Interface {0} is not ready.".format(target_interface))
-            exit(1)
+            print("MAX; Results from process_airport:")
+            print(results)
 
-        logging.debug("Target Interface: {0}".format(target_interface))
+            bind_ip = results["ip"]
+            if bind_ip is None:
+                print(
+                    "Interface {0} does not have a valid IPv4 address assigned.".format(
+                        target_interface
+                    )
+                )
 
-        bind_ip = get_ip_address_from_interface(target_interface)
-        if bind_ip is None:
-            print("Interface {0} does not have a valid IPv4 address assigned.".format(target_interface))
+            logging.debug("Target Interface IP Address: {0}".format(bind_ip))
 
-        logging.debug("Target Interface IP Address: {0}".format(bind_ip))
+        elif system == "Linux":
+            cmd = "cat /sys/class/net/{0}/operstate".format(target_interface)
+            check_interface = get_application_output(cmd, shell=True, timeout=10)
+            if check_interface == "invalid":
+                print("Interface {0} does not exist!".format(target_interface))
+                exit(1)
+
+            elif check_interface == "timeout":
+                print("Unable to get interface {0} status".format(target_interface))
+                exit(1)
+
+            check_interface = check_interface.split("\n")[0]
+            if check_interface != "up":
+                print("Interface {0} is not ready.".format(target_interface))
+                exit(1)
+
+            logging.debug("Target Interface: {0}".format(target_interface))
+
+            bind_ip = get_ip_address_from_interface(target_interface)
+            if bind_ip is None:
+                print("Interface {0} does not have a valid IPv4 address assigned.".format(target_interface))
+
+            logging.debug("Target Interface IP Address: {0}".format(bind_ip))
 
         break
 
     while True:
-        ssid = process_iw(target_interface)["ssid"]
+        if system == "Darwin":
+            ssid = process_airport(target_interface)["ssid"]
+        elif system == "Linux":
+            ssid = process_iw(target_interface)["ssid"]
         question = "You are connected to {0}{1}{2}. Is this the interface you want to benchmark on? (y/N) ".format(
                    TColor.BLUE, ssid, TColor.RESET)
         if ask_y_n(question):
