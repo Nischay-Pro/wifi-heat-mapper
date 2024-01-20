@@ -1,6 +1,7 @@
 import PySimpleGUI as sg
 import os.path
-from wifi_heat_mapper.misc import run_iperf, run_speedtest, process_iw, load_json, save_json, verify_iperf
+import platform
+from wifi_heat_mapper.misc import run_iperf, run_speedtest, process_airport, process_iw, load_json, save_json, verify_iperf
 from wifi_heat_mapper.misc import get_property_from, SpeedTestMode
 from wifi_heat_mapper.graph import generate_graph
 from wifi_heat_mapper.debugger import log_arguments
@@ -9,6 +10,7 @@ import io
 from tqdm import tqdm
 from collections import defaultdict
 import logging
+from time import sleep
 
 
 class ConfigurationError(Exception):
@@ -33,6 +35,8 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
     Returns:
         None
     """
+    system = platform.system()
+
     if os.path.isfile(config_file):
         config_file = os.path.abspath(config_file)
         data = load_json(config_file)
@@ -47,7 +51,10 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
             if libre_speed_server_list == "":
                 libre_speed_server_list = None
 
-            connected_ssid = process_iw(target_interface)["ssid"]
+            if system == "Linux":
+                connected_ssid = process_iw(target_interface)["ssid"]
+            elif system == "Darwin":
+                connected_ssid = process_airport(target_interface)["ssid"]
             logging.debug("SSID Connected: {0}".format(connected_ssid))
             if connected_ssid != ssid:
                 print("Configuration file is for {0} but user connected to {1}"
@@ -198,8 +205,11 @@ def start_gui(floor_map, iperf_server, config_file, output_file=None):
 
         if event == "Benchmark":
             if current_selection is not None:
+                if system == "Linux":
+                    iw = process_iw(target_interface)
+                elif system == "Darwin":
+                    iw = process_airport(target_interface)
 
-                iw = process_iw(target_interface)
                 if iw["ssid"] != ssid:
                     sg.popup_error("SSID mismatch!")
                     print("SSID mismatch!")
@@ -453,54 +463,214 @@ def run_benchmarks(benchmark_modes, benchmark_iterations, iperf_ip, iperf_port, 
         dict: Dictionary containing metrics and their values in
         corresponding key value pairs.
     """
+
+    n_retries = 5
+
+    if platform.system() == "Darwin":
+        os.system("say 'Starting benchmark'")
+
     results = defaultdict(float)
     if "base" in benchmark_modes:
         progress = (len(benchmark_modes) - 1) * benchmark_iterations
     else:
         progress = len(benchmark_modes) * benchmark_iterations
     pbar = tqdm(total=progress)
-    for _ in range(benchmark_iterations):
+    for i in range(benchmark_iterations):
+        print("MAX: starting benchmark iteration")
+
+        if platform.system() == "Darwin":
+            os.system(
+                "say 'Starting benchmark iteration {0} of {1}'".format(
+                    i + 1, benchmark_iterations
+                )
+            )
+
+        # TODO: occasional error
+        # results["download_bits_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"]
+        # KeyError: 'sum_received'
+
         if "tcp_r" in benchmark_modes:
-            logging.debug("Running iperf3 in tcp_r mode")
-            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=True, protocol="tcp")
-            results["download_bits_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"]
-            results["download_bytes_tcp"] += iperf_download["end"]["sum_received"]["bits_per_second"] / 8
-            results["download_bytes_data_tcp"] += iperf_download["end"]["sum_received"]["bytes"]
-            results["download_time_tcp"] += iperf_download["start"]["test_start"]["duration"]
-            pbar.update(1)
+            for i_retry in range(n_retries):
+                logging.debug("Running iperf3 in tcp_r mode")
+                iperf_download = run_iperf(
+                    iperf_ip,
+                    iperf_port,
+                    bind_address,
+                    download=True,
+                    protocol="tcp",
+                )
+                logging.debug(iperf_download)
+                if "error" in iperf_download:
+                    if i_retry == n_retries - 1:
+                        os.system("say 'iperf3 tcp_r failed permanently'")
+                        logging.error(
+                            "iperf3 tcp_r failed after {0} retries".format(
+                                n_retries
+                            )
+                        )
+                    else:
+                        os.system(
+                            "say 'iperf3 tcp_r failed, retry in 3 seeeconds'"
+                        )
+                        sleep(3)
+                    continue
+                else:
+                    results["download_bits_tcp"] += iperf_download["end"][
+                        "sum_received"
+                    ]["bits_per_second"]
+                    results["download_bytes_tcp"] += (
+                        iperf_download["end"]["sum_received"]["bits_per_second"]
+                        / 8
+                    )
+                    results["download_bytes_data_tcp"] += iperf_download["end"][
+                        "sum_received"
+                    ]["bytes"]
+                    results["download_time_tcp"] += iperf_download["start"][
+                        "test_start"
+                    ]["duration"]
+                    pbar.update(1)
+                    break
 
         if "tcp" in benchmark_modes:
-            logging.debug("Running iperf3 in tcp mode")
-            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=False, protocol="tcp")
-            results["upload_bits_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"]
-            results["upload_bytes_tcp"] += iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
-            results["upload_bytes_data_tcp"] += iperf_download["end"]["sum_sent"]["bytes"]
-            results["upload_time_tcp"] += iperf_download["start"]["test_start"]["duration"]
-            pbar.update(1)
+            for i_retry in range(n_retries):
+                logging.debug("Running iperf3 in tcp mode")
+                iperf_download = run_iperf(
+                    iperf_ip,
+                    iperf_port,
+                    bind_address,
+                    download=False,
+                    protocol="tcp",
+                )
+                logging.debug(iperf_download)
+                if "error" in iperf_download:
+                    if i_retry == n_retries - 1:
+                        os.system("say 'iperf3 tcp failed permanently'")
+                        logging.error(
+                            "iperf3 tcp failed after {0} retries".format(
+                                n_retries
+                            )
+                        )
+                    else:
+                        os.system(
+                            "say 'iperf3 tcp failed, retry in 3 seeeconds'"
+                        )
+                        sleep(3)
+                    continue
+                else:
+                    results["upload_bits_tcp"] += iperf_download["end"][
+                        "sum_sent"
+                    ]["bits_per_second"]
+                    results["upload_bytes_tcp"] += (
+                        iperf_download["end"]["sum_sent"]["bits_per_second"] / 8
+                    )
+                    results["upload_bytes_data_tcp"] += iperf_download["end"][
+                        "sum_sent"
+                    ]["bytes"]
+                    results["upload_time_tcp"] += iperf_download["start"][
+                        "test_start"
+                    ]["duration"]
+                    pbar.update(1)
+                    break
 
         if "udp_r" in benchmark_modes:
-            logging.debug("Running iperf3 in udp_r mode")
-            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=True, protocol="udp")
-            results["download_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
-            results["download_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
-            results["download_bytes_data_udp"] += iperf_download["end"]["sum"]["bytes"]
-            results["download_time_udp"] += iperf_download["start"]["test_start"]["duration"]
-            results["download_jitter_udp"] += iperf_download["end"]["sum"]["jitter_ms"]
-            results["download_jitter_packets_udp"] += iperf_download["end"]["sum"]["packets"]
-            results["download_jitter_lost_packets_udp"] += iperf_download["end"]["sum"]["lost_packets"]
-            pbar.update(1)
+            for i_retry in range(n_retries):
+                logging.debug("Running iperf3 in udp_r mode")
+                iperf_download = run_iperf(
+                    iperf_ip,
+                    iperf_port,
+                    bind_address,
+                    download=True,
+                    protocol="udp",
+                )
+                logging.debug(iperf_download)
+                if "error" in iperf_download:
+                    if i_retry == n_retries - 1:
+                        os.system("say 'iperf3 udp_r failed permanently'")
+                        logging.error(
+                            "iperf3 udp_r failed after {0} retries".format(
+                                n_retries
+                            )
+                        )
+                    else:
+                        os.system(
+                            "say 'iperf3 udp_r failed, retry in 3 seeeconds'"
+                        )
+                        sleep(3)
+                    continue
+                else:
+                    results["download_bits_udp"] += iperf_download["end"][
+                        "sum"
+                    ]["bits_per_second"]
+                    results["download_bytes_udp"] += (
+                        iperf_download["end"]["sum"]["bits_per_second"] / 8
+                    )
+                    results["download_bytes_data_udp"] += iperf_download["end"][
+                        "sum"
+                    ]["bytes"]
+                    results["download_time_udp"] += iperf_download["start"][
+                        "test_start"
+                    ]["duration"]
+                    results["download_jitter_udp"] += iperf_download["end"][
+                        "sum"
+                    ]["jitter_ms"]
+                    results["download_jitter_packets_udp"] += iperf_download[
+                        "end"
+                    ]["sum"]["packets"]
+                    results[
+                        "download_jitter_lost_packets_udp"
+                    ] += iperf_download["end"]["sum"]["lost_packets"]
+                    pbar.update(1)
+                    break
 
         if "udp" in benchmark_modes:
-            logging.debug("Running iperf3 in udp mode")
-            iperf_download = run_iperf(iperf_ip, iperf_port, bind_address, download=False, protocol="udp")
-            results["upload_bits_udp"] += iperf_download["end"]["sum"]["bits_per_second"]
-            results["upload_bytes_udp"] += iperf_download["end"]["sum"]["bits_per_second"] / 8
-            results["upload_bytes_data_udp"] += iperf_download["end"]["sum"]["bytes"]
-            results["upload_time_udp"] += iperf_download["start"]["test_start"]["duration"]
-            results["upload_jitter_udp"] += iperf_download["end"]["sum"]["jitter_ms"]
-            results["upload_jitter_packets_udp"] += iperf_download["end"]["sum"]["packets"]
-            results["upload_jitter_lost_packets_udp"] += iperf_download["end"]["sum"]["lost_packets"]
-            pbar.update(1)
+            for i_retry in range(n_retries):
+                logging.debug("Running iperf3 in udp mode")
+                iperf_download = run_iperf(
+                    iperf_ip,
+                    iperf_port,
+                    bind_address,
+                    download=False,
+                    protocol="udp",
+                )
+                logging.debug(iperf_download)
+                if "error" in iperf_download:
+                    if i_retry == n_retries - 1:
+                        os.system("say 'iperf3 udp failed permanently'")
+                        logging.error(
+                            "iperf3 udp failed after {0} retries".format(
+                                n_retries
+                            )
+                        )
+                    else:
+                        os.system(
+                            "say 'iperf3 udp failed, retry in 3 seeeconds'"
+                        )
+                        sleep(3)
+                    continue
+                else:
+                    results["upload_bits_udp"] += iperf_download["end"]["sum"][
+                        "bits_per_second"
+                    ]
+                    results["upload_bytes_udp"] += (
+                        iperf_download["end"]["sum"]["bits_per_second"] / 8
+                    )
+                    results["upload_bytes_data_udp"] += iperf_download["end"][
+                        "sum"
+                    ]["bytes"]
+                    results["upload_time_udp"] += iperf_download["start"][
+                        "test_start"
+                    ]["duration"]
+                    results["upload_jitter_udp"] += iperf_download["end"][
+                        "sum"
+                    ]["jitter_ms"]
+                    results["upload_jitter_packets_udp"] += iperf_download[
+                        "end"
+                    ]["sum"]["packets"]
+                    results["upload_jitter_lost_packets_udp"] += iperf_download[
+                        "end"
+                    ]["sum"]["lost_packets"]
+                    pbar.update(1)
+                    break
 
         if "speedtest" in benchmark_modes:
             logging.debug("Running speedtest enum value: {0}".format(speedtest_mode))
