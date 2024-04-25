@@ -32,22 +32,22 @@ By default Tkinter is not installed with Python. Users are requested to install 
 
 ### Arch Linux and Manjaro
 ```bash
-$ pacman -S tk
+pacman -S tk
 ```
 
 ### Fedora, CentOS, RHEL and RockyLinux
 ```bash
-$ dnf install python3-tkinter
+dnf install python3-tkinter
 ```
 
 ### Debian and Ubuntu
 ```bash
-$ apt install python3-tk
+apt install python3-tk
 ```
 
 ### openSUSE and SUSE Linux Enterprise
 ```bash
-$ zypper install python3-tk
+zypper install python3-tk
 ```
 
 ### Gentoo
@@ -58,15 +58,15 @@ $ zypper install python3-tk
 The easiest way to install whm is via [pip](https://pip.pypa.io/en/stable/).
 
 ```bash
-$ pip install whm
+pip install whm
 ```
 
 Alternatively, you can clone the repository and compile it.
 
 ```bash
-$ git clone https://github.com/Nischay-Pro/wifi-heat-mapper.git
-$ cd wifi-heat-mapper
-$ python3 setup.py install
+git clone https://github.com/Nischay-Pro/wifi-heat-mapper.git
+cd wifi-heat-mapper
+python3 setup.py install
 ```
 
 ## Usage
@@ -87,7 +87,7 @@ Initially, you need to bootstrap your configuration specifying the graphs you wo
 whm supports multiple graphs allowing users to select one, more, or all graphs. The tool will automatically gather the appropriate metrics to generate the graphs.
 
 ```bash
-$ whm bootstrap
+whm bootstrap
 ```
 
 > **NOTE:** To profile metrics from Ookla speedtest, the user needs to ensure that they have installed the binary provided by Ookla and is accessible from `$PATH` environment variable.
@@ -99,7 +99,7 @@ To specify a save path and file name use the `--config` option, including the pa
 For example:
 
 ```bash
-$ whm bootstrap --config /home/example/whm/test.json
+whm bootstrap --config /home/example/whm/test.json
 ```
 
 #### Benchmarking
@@ -107,7 +107,7 @@ $ whm bootstrap --config /home/example/whm/test.json
 Once you have generated the configuration file you can start benchmarking.
 
 ```bash
-$ whm benchmark -m examples/sample_floor_map.jpg -s 192.168.1.100 -c config.json 
+whm benchmark -m examples/sample_floor_map.jpg -s 192.168.1.100 -c config.json 
 ```
 
 Command-line options used:
@@ -162,7 +162,7 @@ whm also offers the user additional command-line arguments when plotting.
 To generate plots with custom flags, you can specify them using the `whm plot` command.
 
 ```bash
-$ whm plot -m ./examples/sample_floor_map.jpg -c config.json -l 100 -d 300 -f png 
+whm plot -m ./examples/sample_floor_map.jpg -c config.json -l 100 -d 300 -f png 
 ```
 
 Command-line options used:
