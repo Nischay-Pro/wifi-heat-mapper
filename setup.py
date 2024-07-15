@@ -11,7 +11,7 @@ install_requirements = [
     "Pillow>=8.2.0",
     "scipy>=1.6.0",
     "numpy>=1.20.0",
-    "PySimpleGUI>=4.34.0",
+    "PySimpleGUI-4-foss>=4.60.4.1",
 ]
 
 setup(
