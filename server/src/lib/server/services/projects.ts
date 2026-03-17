@@ -1,5 +1,15 @@
 import { getDb } from "$lib/server/db/schema";
 
+export async function listProjects() {
+	const db = getDb();
+
+	return db
+		.selectFrom("projects")
+		.select(["id", "slug", "name", "description", "created_at", "updated_at"])
+		.orderBy("created_at", "asc")
+		.execute();
+}
+
 export async function getProjectBySlug(slug: string) {
 	const db = getDb();
 

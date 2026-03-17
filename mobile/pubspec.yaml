@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_riverpod: ^3.3.1
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:
