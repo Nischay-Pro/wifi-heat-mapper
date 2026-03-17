@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -75,15 +76,24 @@ class _ServerConnectPageState extends State<ServerConnectPage> {
         _isError = true;
         _isConnecting = false;
       });
-    } on HttpException catch (error) {
+    } on HttpException {
       setState(() {
-        _statusMessage = error.message;
+        _statusMessage =
+            'The server responded unexpectedly. Verify the WHM server URL and that the server is running.';
         _isError = true;
         _isConnecting = false;
       });
-    } on SocketException catch (error) {
+    } on SocketException {
       setState(() {
-        _statusMessage = 'Could not reach server: ${error.message}';
+        _statusMessage =
+            'Could not connect to the server. Check the server URL, network access, and that the WHM server is reachable.';
+        _isError = true;
+        _isConnecting = false;
+      });
+    } on TimeoutException {
+      setState(() {
+        _statusMessage =
+            'Connection timed out after ${serverConnectionTimeout.inSeconds}s. Check the server URL and network access.';
         _isError = true;
         _isConnecting = false;
       });

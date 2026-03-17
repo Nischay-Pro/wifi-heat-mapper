@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 const clientName = 'whm-mobile';
 const clientVersion = '0.1.0';
 const clientApiVersion = 1;
+const serverConnectionTimeout = Duration(seconds: 3);
 
 class ServerInfo {
   const ServerInfo({
@@ -63,8 +65,9 @@ CompatibilityResult checkServerCompatibility(ServerInfo serverInfo) {
     return CompatibilityResult(
       isCompatible: false,
       message:
-          'Server ${serverInfo.version} is older than this client. '
-          'Server API ${serverInfo.apiVersion} does not support client API $clientApiVersion.',
+          'This server is older than the app. '
+          'Update the WHM server to a version that supports client API $clientApiVersion '
+          '(current server API: ${serverInfo.apiVersion}, server version: ${serverInfo.version}).',
     );
   }
 
@@ -72,8 +75,9 @@ CompatibilityResult checkServerCompatibility(ServerInfo serverInfo) {
     return CompatibilityResult(
       isCompatible: false,
       message:
-          'This client is too old for server ${serverInfo.version}. '
-          'Server requires client API ${serverInfo.minClientApiVersion}+.',
+          'This app is too old for the server. '
+          'Update the mobile app to a version that supports server ${serverInfo.version} '
+          '(required client API: ${serverInfo.minClientApiVersion}+).',
     );
   }
 
@@ -84,11 +88,11 @@ Future<ServerInfo> fetchServerInfo(String serverUrl) async {
   final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
   final infoUri = baseUri.replace(path: '${baseUri.path}/api/server-info'.replaceAll('//', '/'));
 
-  final httpClient = HttpClient();
+  final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
 
   try {
-    final request = await httpClient.getUrl(infoUri);
-    final response = await request.close();
+    final request = await httpClient.getUrl(infoUri).timeout(serverConnectionTimeout);
+    final response = await request.close().timeout(serverConnectionTimeout);
     final responseBody = await utf8.decodeStream(response);
 
     if (response.statusCode != HttpStatus.ok) {
