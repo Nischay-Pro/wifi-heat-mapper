@@ -12,7 +12,7 @@ This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com
 
 ## Dependencies
 ### Required
-* Python version: 3.7 - 3.9 (with Tkinter)
+* Python version: 3.10+ (with Tkinter)
 * iperf3 >= 0.1.11
 * matplotlib >= 3.4.0
 * tqdm >= 4.55.0
@@ -61,12 +61,12 @@ The easiest way to install whm is via [pip](https://pip.pypa.io/en/stable/).
 $ pip install whm
 ```
 
-Alternatively, you can clone the repository and compile it.
+Alternatively, you can clone the repository and install it locally.
 
 ```bash
 $ git clone https://github.com/Nischay-Pro/wifi-heat-mapper.git
 $ cd wifi-heat-mapper
-$ python3 setup.py install
+$ python3 -m pip install .
 ```
 
 ## Usage
@@ -112,7 +112,7 @@ $ whm benchmark -m examples/sample_floor_map.jpg -s 192.168.1.100 -c config.json
 
 Command-line options used:
 
-* `-m` or `--map` is the path to the floop map.
+* `-m` or `--map` is the path to the floor map.
 * `-s` or `--server` is the IP address(:port) of the iperf3 server. You can specify a port using `IPADDRESS:PORT`, like `192.168.1.100:5123`. If no port is specified the default port `5201` is used.
 * `-c` or `--config` is the path to the configuration file you bootstrapped earlier.
 
@@ -167,7 +167,7 @@ $ whm plot -m ./examples/sample_floor_map.jpg -c config.json -l 100 -d 300 -f pn
 
 Command-line options used:
 
-* `-m` or `--map` is the path to the floop map.
+* `-m` or `--map` is the path to the floor map.
 * `-c` or `--config` is the path to the configuration file you bootstrapped earlier.
 * `-l` or `--levels` (optional) is the number and positions of the contour lines / regions. Default (100)
 * `-d` or `--dpi` (optional) is the resolution of the figure in dots-per-inch. Default (300)
@@ -184,7 +184,12 @@ A sample configuration, including benchmark results and plots generated is provi
 ## Contributing
 Pull requests are welcome. For significant changes, please open an issue first to discuss what you would like to change.
 
-Please make sure to run tests as appropriate.
+Please make sure to run checks as appropriate.
+
+```bash
+$ python3 -m ruff check .
+$ python3 -m build
+```
 
 ## License
 [GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
