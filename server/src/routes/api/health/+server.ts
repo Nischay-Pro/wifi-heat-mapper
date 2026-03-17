@@ -1,5 +1,6 @@
 import { ok } from "$lib/server/api/http";
 import { getDb } from "$lib/server/db/schema";
+import { getServerInfo } from "$lib/server/version";
 
 export async function GET() {
 	const db = getDb();
@@ -10,6 +11,7 @@ export async function GET() {
 
 	return ok({
 		status: "ok",
-		project_count: Number(result.count)
+		project_count: Number(result.count),
+		server: getServerInfo()
 	});
 }
