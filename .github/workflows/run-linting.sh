@@ -3,4 +3,4 @@
 set -e
 set -x
 
-python3 -m flake8 .
+python3 -m ruff check .

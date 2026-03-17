@@ -114,7 +114,6 @@ class ConfigurationOptions:
         "mode": ["iperf3"],
         "conversion": False,
         "reverse": True,
-        "reverse": True,
     }
     configuration["speedtest_latency"] = {
         "description": "Speedtest Wi-Fi Latency (in ms)",

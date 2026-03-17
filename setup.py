@@ -39,6 +39,6 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     install_requires=install_requirements,
     packages=find_packages(),
-    python_requires=">=3.7",
+    python_requires=">=3.10",
     zip_safe=True,
 )
