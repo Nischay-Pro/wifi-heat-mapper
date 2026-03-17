@@ -110,26 +110,3 @@ Future<ServerInfo> fetchServerInfo(String serverUrl) async {
     httpClient.close();
   }
 }
-
-Future<String> promptForServerUrl({
-  Stdin? input,
-  Stdout? output,
-}) async {
-  final resolvedInput = input ?? stdin;
-  final resolvedOutput = output ?? stdout;
-
-  while (true) {
-    resolvedOutput.write('Server URL: ');
-    final value = resolvedInput.readLineSync();
-
-    if (value == null) {
-      throw const StdinException('No server URL provided.');
-    }
-
-    try {
-      return normalizeServerUrl(value);
-    } on FormatException catch (error) {
-      resolvedOutput.writeln(error.message);
-    }
-  }
-}

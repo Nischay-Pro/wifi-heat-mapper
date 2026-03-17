@@ -1,5 +1,5 @@
+import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/mobile.dart';
-import 'package:test/test.dart';
 
 void main() {
   group('normalizeServerUrl', () {
