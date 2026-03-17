@@ -13,3 +13,4 @@ dist/*
 *.ps
 *.svg
 *.log
+venv/*

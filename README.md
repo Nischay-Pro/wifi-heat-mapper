@@ -19,7 +19,7 @@ This tool is heavily inspired by [python-wifi-survey-heatmap](https://github.com
 * Pillow >= 8.2.0
 * scipy >= 1.6.0
 * numpy >= 1.20.0
-* PySimpleGUI >= 4.34.0
+* FreeSimpleGUI >= 5.2.0
 
 ### Optional
 * [Ookla Speedtest CLI](https://www.speedtest.net/apps/cli) >= 1.0.0.2 (Recommended)

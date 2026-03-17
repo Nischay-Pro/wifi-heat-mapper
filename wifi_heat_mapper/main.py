@@ -1,9 +1,6 @@
 import argparse
 import sys
-from wifi_heat_mapper.gui import start_gui
 from wifi_heat_mapper import __version__
-from wifi_heat_mapper.config import start_config
-from wifi_heat_mapper.graph import generate_graph
 import logging
 
 
@@ -72,18 +69,21 @@ def driver():
         print_version()
         exit()
 
-    if args.debug_mode:
+    if getattr(args, "debug_mode", False):
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s",
                             datefmt="%d-%b-%y %H:%M:%S", filename="debug.log")
         logging.debug("Enabled debug mode")
 
     if args.mode == "bootstrap":
+        from wifi_heat_mapper.config import start_config
         start_config(args.config_file)
 
     elif args.mode == "benchmark":
+        from wifi_heat_mapper.gui import start_gui
         start_gui(args.floor_map, args.iperf_server, args.config_file)
 
     elif args.mode == "plot":
+        from wifi_heat_mapper.graph import generate_graph
         generate_graph(args.config_file, args.floor_map, levels=int(args.levels), dpi=int(args.dpi),
                        file_type=args.file_type)
 
