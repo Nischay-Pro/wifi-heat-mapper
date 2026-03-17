@@ -9,14 +9,22 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"db:migrate": "tsx scripts/migrate.ts"
+	},
+	"dependencies": {
+		"dotenv": "^17.2.3",
+		"kysely": "^0.28.8",
+		"pg": "^8.16.3"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@types/pg": "^8.15.6",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
+		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"vite": "^7.3.1"
 	}

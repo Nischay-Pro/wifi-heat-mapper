@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: whm-postgres
+    environment:
+      POSTGRES_DB: whm
+      POSTGRES_USER: whm
+      POSTGRES_PASSWORD: whm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

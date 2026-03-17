@@ -1,42 +1,48 @@
-# sv
+This is the WHM v2 server app built with [SvelteKit](https://svelte.dev/docs/kit), [Kysely](https://kysely.dev/), and PostgreSQL.
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+## Setup
 
-## Creating a project
+1. Install dependencies.
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
+```bash
+npm install
 ```
 
-To recreate this project with the same configuration:
+2. Start PostgreSQL from the repository root.
 
-```sh
-# recreate this project
-npx sv@0.12.7 create --template minimal --types ts --install npm server
+```bash
+docker compose up -d postgres
 ```
 
-## Developing
+3. Copy the example environment file.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+```bash
+cp .env.example .env
+```
 
-```sh
+4. Apply the database migration.
+
+```bash
+npm run db:migrate
+```
+
+5. Start the development server.
+
+```bash
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+The initial migration creates these tables:
 
-To create a production version of your app:
+- `projects`
+- `floor_maps`
+- `points`
+- `devices`
+- `measurement_sessions`
+- `measurements`
+- `schema_migrations`
 
-```sh
-npm run build
-```
+It also seeds one project:
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+- slug: `default`
+- name: `Default`
