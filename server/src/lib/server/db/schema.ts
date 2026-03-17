@@ -1,3 +1,4 @@
+import { env } from "$env/dynamic/private";
 import { Kysely, PostgresDialect, type ColumnType, type Generated } from "kysely";
 import { Pool } from "pg";
 
@@ -103,7 +104,7 @@ export interface Database {
 }
 
 function requireDatabaseUrl(): string {
-	const databaseUrl = process.env.DATABASE_URL;
+	const databaseUrl = env.DATABASE_URL;
 
 	if (!databaseUrl) {
 		throw new Error("DATABASE_URL is required.");
