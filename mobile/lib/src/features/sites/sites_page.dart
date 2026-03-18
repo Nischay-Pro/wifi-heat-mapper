@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile/src/app/platform_route.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
+import 'package:mobile/src/features/measurements/measurements_page.dart';
+import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
+import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
 import 'package:mobile/src/models/site_summary.dart';
 
 class SitesPage extends ConsumerWidget {
@@ -12,11 +16,35 @@ class SitesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final connectionState = ref.watch(serverConnectionControllerProvider);
     final controller = ref.read(serverConnectionControllerProvider.notifier);
+    final wifiPermissionService = ref.read(wifiPermissionServiceProvider);
 
     return SitesView(
       connectionState: connectionState,
       onSelectSite: controller.selectSite,
       onRefreshSites: controller.connect,
+      onContinue: () async {
+        if (connectionState.selectedSiteSlug == null) {
+          return;
+        }
+
+        final requirementsMet = await wifiPermissionService.areRequirementsMet();
+        if (!context.mounted) {
+          return;
+        }
+
+        if (requirementsMet) {
+          await Navigator.of(context).push(
+            platformPageRoute<void>(
+              MeasurementsPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
+            ),
+          );
+          return;
+        }
+
+        await Navigator.of(context).push(
+          platformPageRoute<void>(const WifiPermissionsPage()),
+        );
+      },
       onChangeServer: () => Navigator.of(context).pop(),
     );
   }
@@ -28,12 +56,14 @@ class SitesView extends StatelessWidget {
     required this.connectionState,
     required this.onSelectSite,
     required this.onRefreshSites,
+    required this.onContinue,
     required this.onChangeServer,
   });
 
   final ServerConnectionState connectionState;
   final ValueChanged<String> onSelectSite;
   final Future<void> Function() onRefreshSites;
+  final Future<void> Function() onContinue;
   final VoidCallback onChangeServer;
 
   @override
@@ -101,6 +131,13 @@ class SitesView extends StatelessWidget {
                   onPressed: onChangeServer,
                   child: const Text('Change server'),
                 ),
+                if (selectedSiteSlug != null) ...[
+                  SizedBox(height: spacing.regular),
+                  FilledButton(
+                    onPressed: onContinue,
+                    child: const Text('Continue'),
+                  ),
+                ],
                 if (selectedSiteSlug != null) ...[
                   SizedBox(height: spacing.regular),
                   Card(
