@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -18,22 +20,76 @@ class MeasurementsPage extends ConsumerStatefulWidget {
   ConsumerState<MeasurementsPage> createState() => _MeasurementsPageState();
 }
 
-class _MeasurementsPageState extends ConsumerState<MeasurementsPage> {
+class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
+    with WidgetsBindingObserver {
   WifiMetadata _wifiMetadata = const WifiMetadata();
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _isRequestInFlight = false;
   String? _errorMessage;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
-    _loadMetadata();
+    WidgetsBinding.instance.addObserver(this);
+    _loadMetadata(showLoading: true);
+    _startPolling();
   }
 
-  Future<void> _loadMetadata() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _loadMetadata();
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _loadMetadata(),
+    );
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _loadMetadata({bool showLoading = false}) async {
+    if (_isRequestInFlight) {
+      return;
+    }
+
+    _isRequestInFlight = true;
+
+    if (mounted) {
+      setState(() {
+        if (showLoading) {
+          _isLoading = true;
+        } else {
+          _isRefreshing = true;
+        }
+        _errorMessage = null;
+      });
+    }
 
     try {
       final metadata = await ref.read(wifiMetadataServiceProvider).loadMetadata();
@@ -44,6 +100,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage> {
       setState(() {
         _wifiMetadata = metadata;
         _isLoading = false;
+        _isRefreshing = false;
       });
     } on MissingPluginException {
       if (!mounted) {
@@ -53,6 +110,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage> {
       setState(() {
         _wifiMetadata = const WifiMetadata();
         _isLoading = false;
+        _isRefreshing = false;
         _errorMessage =
             'Wi-Fi metadata collection is not available on this device yet.';
       });
@@ -64,9 +122,12 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage> {
       setState(() {
         _wifiMetadata = const WifiMetadata();
         _isLoading = false;
+        _isRefreshing = false;
         _errorMessage = error.message ??
             'Could not load Wi-Fi metadata from the device.';
       });
+    } finally {
+      _isRequestInFlight = false;
     }
   }
 
@@ -76,8 +137,9 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage> {
       selectedSiteSlug: widget.selectedSiteSlug,
       wifiMetadata: _wifiMetadata,
       isLoading: _isLoading,
+      isRefreshing: _isRefreshing,
       errorMessage: _errorMessage,
-      onRefresh: _loadMetadata,
+      onRefresh: () => _loadMetadata(showLoading: false),
     );
   }
 }
@@ -88,6 +150,7 @@ class MeasurementsView extends StatelessWidget {
     required this.selectedSiteSlug,
     required this.wifiMetadata,
     required this.isLoading,
+    required this.isRefreshing,
     required this.errorMessage,
     required this.onRefresh,
   });
@@ -95,6 +158,7 @@ class MeasurementsView extends StatelessWidget {
   final String selectedSiteSlug;
   final WifiMetadata wifiMetadata;
   final bool isLoading;
+  final bool isRefreshing;
   final String? errorMessage;
   final Future<void> Function() onRefresh;
 
@@ -127,9 +191,9 @@ class MeasurementsView extends StatelessWidget {
         title: const Text('Measurements'),
         actions: [
           IconButton(
-            onPressed: isLoading ? null : onRefresh,
+            onPressed: isLoading || isRefreshing ? null : onRefresh,
             tooltip: 'Refresh Wi-Fi details',
-            icon: isLoading
+            icon: isLoading || isRefreshing
                 ? const LoadingIndicator.small()
                 : const Icon(Icons.refresh),
           ),
@@ -148,11 +212,6 @@ class MeasurementsView extends StatelessWidget {
                 Text(
                   'Temporary page for Wi-Fi metadata collection and debugging.',
                   style: textTheme.bodyMedium,
-                ),
-                SizedBox(height: spacing.regular),
-                Text(
-                  'Selected site: $selectedSiteSlug',
-                  style: textTheme.bodySmall,
                 ),
                 SizedBox(height: spacing.regular),
                 if (isLoading)
