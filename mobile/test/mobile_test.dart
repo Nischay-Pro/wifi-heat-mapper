@@ -91,6 +91,40 @@ void main() {
     });
   });
 
+  group('WifiMetadata', () {
+    test('parses wifi metadata json', () {
+      final wifiMetadata = WifiMetadata.fromJson(const {
+        'status': 'available',
+        'ssid': 'ExampleWiFi',
+        'bssid': 'aa:bb:cc:dd:ee:ff',
+        'channel': 36,
+        'channel_frequency': 5180,
+        'client_ip': '192.168.7.50',
+        'frequency_mhz': 5180,
+        'interface_name': 'wlan0',
+        'platform': 'android',
+        'rssi': -58,
+        'signal_quality': 74,
+        'signal_quality_percent': 74.0,
+        'signal_strength': -58,
+      });
+
+      expect(wifiMetadata.status, WifiMetadataStatus.available);
+      expect(wifiMetadata.ssid, 'ExampleWiFi');
+      expect(wifiMetadata.bssid, 'aa:bb:cc:dd:ee:ff');
+      expect(wifiMetadata.channel, 36);
+      expect(wifiMetadata.channelFrequency, 5180);
+      expect(wifiMetadata.clientIp, '192.168.7.50');
+      expect(wifiMetadata.frequencyMhz, 5180);
+      expect(wifiMetadata.interfaceName, 'wlan0');
+      expect(wifiMetadata.platform, 'android');
+      expect(wifiMetadata.rssi, -58);
+      expect(wifiMetadata.signalQuality, 74);
+      expect(wifiMetadata.signalQualityPercent, 74.0);
+      expect(wifiMetadata.signalStrength, -58);
+    });
+  });
+
   group('SitesView', () {
     testWidgets('shows an empty state when no sites are available', (tester) async {
       final state = ServerConnectionState(

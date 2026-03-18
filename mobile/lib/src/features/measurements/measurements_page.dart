@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile/src/core/material_spacing.dart';
+import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/wifi_metadata.dart';
 
-class MeasurementsPage extends StatelessWidget {
+class MeasurementsPage extends ConsumerStatefulWidget {
   const MeasurementsPage({
     super.key,
     required this.selectedSiteSlug,
@@ -11,12 +14,69 @@ class MeasurementsPage extends StatelessWidget {
   final String selectedSiteSlug;
 
   @override
-  Widget build(BuildContext context) {
-    const wifiMetadata = WifiMetadata();
+  ConsumerState<MeasurementsPage> createState() => _MeasurementsPageState();
+}
 
+class _MeasurementsPageState extends ConsumerState<MeasurementsPage> {
+  WifiMetadata _wifiMetadata = const WifiMetadata();
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMetadata();
+  }
+
+  Future<void> _loadMetadata() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final metadata = await ref.read(wifiMetadataServiceProvider).loadMetadata();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _wifiMetadata = metadata;
+        _isLoading = false;
+      });
+    } on MissingPluginException {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _wifiMetadata = const WifiMetadata();
+        _isLoading = false;
+        _errorMessage =
+            'Wi-Fi metadata collection is not available on this device yet.';
+      });
+    } on PlatformException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _wifiMetadata = const WifiMetadata();
+        _isLoading = false;
+        _errorMessage = error.message ??
+            'Could not load Wi-Fi metadata from the device.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MeasurementsView(
-      selectedSiteSlug: selectedSiteSlug,
-      wifiMetadata: wifiMetadata,
+      selectedSiteSlug: widget.selectedSiteSlug,
+      wifiMetadata: _wifiMetadata,
+      isLoading: _isLoading,
+      errorMessage: _errorMessage,
+      onRefresh: _loadMetadata,
     );
   }
 }
@@ -26,10 +86,16 @@ class MeasurementsView extends StatelessWidget {
     super.key,
     required this.selectedSiteSlug,
     required this.wifiMetadata,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.onRefresh,
   });
 
   final String selectedSiteSlug;
   final WifiMetadata wifiMetadata;
+  final bool isLoading;
+  final String? errorMessage;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +124,18 @@ class MeasurementsView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Measurements'),
+        actions: [
+          IconButton(
+            onPressed: isLoading ? null : onRefresh,
+            tooltip: 'Refresh Wi-Fi details',
+            icon: isLoading
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Align(
@@ -79,6 +157,71 @@ class MeasurementsView extends StatelessWidget {
                   style: textTheme.bodySmall,
                 ),
                 SizedBox(height: spacing.regular),
+                if (isLoading)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: spacing.regular),
+                    child: Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(spacing.regular),
+                        child: Row(
+                          children: [
+                            const CircularProgressIndicator.adaptive(),
+                            SizedBox(width: spacing.regular),
+                            Expanded(
+                              child: Text(
+                                'Loading current Wi-Fi metadata from this device.',
+                                style: textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (errorMessage != null)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: spacing.regular),
+                    child: Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(spacing.regular),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline),
+                            SizedBox(width: spacing.compact),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (!isLoading && wifiMetadata.isEmpty && errorMessage == null)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: spacing.regular),
+                    child: Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(spacing.regular),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline),
+                            SizedBox(width: spacing.compact),
+                            Expanded(
+                              child: Text(
+                                _statusMessage(wifiMetadata.status),
+                                style: textTheme.bodyMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ...items.map(
                   (item) => Padding(
                     padding: EdgeInsets.only(bottom: spacing.compact),
@@ -100,5 +243,21 @@ class MeasurementsView extends StatelessWidget {
 
   String _formatInt(int? value) {
     return value == null ? 'Not available yet' : '$value';
+  }
+
+  String _statusMessage(WifiMetadataStatus status) {
+    return switch (status) {
+      WifiMetadataStatus.available => 'Wi-Fi metadata is available.',
+      WifiMetadataStatus.wifiDisabled =>
+        'Wi-Fi is turned off. Turn on Wi-Fi to collect Wi-Fi metadata.',
+      WifiMetadataStatus.wifiNotConnected =>
+        'Wi-Fi is not connected. Join a Wi-Fi network to continue.',
+      WifiMetadataStatus.permissionsMissing =>
+        'Wi-Fi permissions are missing. Grant the required access to collect Wi-Fi metadata.',
+      WifiMetadataStatus.unsupportedPlatform =>
+        'Wi-Fi metadata collection is not supported on this platform yet.',
+      WifiMetadataStatus.unavailable =>
+        'No Wi-Fi metadata is available from the device right now.',
+    };
   }
 }
