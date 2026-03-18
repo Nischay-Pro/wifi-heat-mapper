@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
+import 'package:mobile/src/features/connect/server_connection_state.dart';
 import 'package:mobile/src/models/site_summary.dart';
 
 class SitesPage extends ConsumerWidget {
@@ -11,12 +12,55 @@ class SitesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final connectionState = ref.watch(serverConnectionControllerProvider);
     final controller = ref.read(serverConnectionControllerProvider.notifier);
+
+    return SitesView(
+      connectionState: connectionState,
+      onSelectSite: controller.selectSite,
+      onRefreshSites: controller.connect,
+      onChangeServer: () => Navigator.of(context).pop(),
+    );
+  }
+}
+
+class SitesView extends StatelessWidget {
+  const SitesView({
+    super.key,
+    required this.connectionState,
+    required this.onSelectSite,
+    required this.onRefreshSites,
+    required this.onChangeServer,
+  });
+
+  final ServerConnectionState connectionState;
+  final ValueChanged<String> onSelectSite;
+  final Future<void> Function() onRefreshSites;
+  final VoidCallback onChangeServer;
+
+  @override
+  Widget build(BuildContext context) {
     final spacing = MaterialSpacing.of(context);
     final textTheme = Theme.of(context).textTheme;
+    final selectedSiteSlug = connectionState.sites.any(
+      (site) => site.slug == connectionState.selectedSiteSlug,
+    )
+        ? connectionState.selectedSiteSlug
+        : null;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Available sites'),
+        actions: [
+          IconButton(
+            onPressed: connectionState.isConnecting ? null : onRefreshSites,
+            tooltip: 'Refresh sites',
+            icon: connectionState.isConnecting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Align(
@@ -47,17 +91,17 @@ class SitesPage extends ConsumerWidget {
                       padding: EdgeInsets.only(bottom: spacing.compact),
                       child: _SiteTile(
                         site: site,
-                        isSelected: connectionState.selectedSiteSlug == site.slug,
-                        onSelect: () => controller.selectSite(site.slug),
+                        isSelected: selectedSiteSlug == site.slug,
+                        onSelect: () => onSelectSite(site.slug),
                       ),
                     ),
                   ),
                 SizedBox(height: spacing.regular),
                 OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: onChangeServer,
                   child: const Text('Change server'),
                 ),
-                if (connectionState.selectedSiteSlug != null) ...[
+                if (selectedSiteSlug != null) ...[
                   SizedBox(height: spacing.regular),
                   Card(
                     child: Padding(
@@ -68,7 +112,7 @@ class SitesPage extends ConsumerWidget {
                           SizedBox(width: spacing.compact),
                           Expanded(
                             child: Text(
-                              'Selected site: ${connectionState.selectedSiteSlug}',
+                              'Selected site: $selectedSiteSlug',
                               style: textTheme.bodyMedium,
                             ),
                           ),
