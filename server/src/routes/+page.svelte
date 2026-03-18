@@ -53,8 +53,8 @@
 
 						<dl class="meta">
 							<div>
-								<dt>Project</dt>
-								<dd>{measurement.project_name} ({measurement.project_slug})</dd>
+								<dt>Site</dt>
+								<dd>{measurement.site_name} ({measurement.site_slug})</dd>
 							</div>
 							<div>
 								<dt>Point</dt>

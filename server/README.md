@@ -34,7 +34,7 @@ npm run dev
 
 The initial migration creates these tables:
 
-- `projects`
+- `sites`
 - `floor_maps`
 - `points`
 - `devices`

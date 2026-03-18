@@ -4,18 +4,18 @@ class AppPreferences {
   AppPreferences(this._preferences);
 
   static const serverUrlKey = 'server_url';
-  static const selectedProjectSlugKey = 'selected_project_slug';
+  static const selectedSiteSlugKey = 'selected_site_slug';
 
   final SharedPreferences _preferences;
 
   String? getServerUrl() => _preferences.getString(serverUrlKey);
 
-  String? getSelectedProjectSlug() => _preferences.getString(selectedProjectSlugKey);
+  String? getSelectedSiteSlug() => _preferences.getString(selectedSiteSlugKey);
 
   Future<bool> setServerUrl(String value) => _preferences.setString(serverUrlKey, value);
 
-  Future<bool> setSelectedProjectSlug(String value) =>
-      _preferences.setString(selectedProjectSlugKey, value);
+  Future<bool> setSelectedSiteSlug(String value) =>
+      _preferences.setString(selectedSiteSlugKey, value);
 
-  Future<bool> clearSelectedProjectSlug() => _preferences.remove(selectedProjectSlugKey);
+  Future<bool> clearSelectedSiteSlug() => _preferences.remove(selectedSiteSlugKey);
 }

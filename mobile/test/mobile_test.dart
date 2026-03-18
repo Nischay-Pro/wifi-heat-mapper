@@ -22,6 +22,7 @@ void main() {
           version: '0.1.0',
           apiVersion: 1,
           minClientApiVersion: 1,
+          databaseReady: true,
         ),
       );
 
@@ -35,6 +36,7 @@ void main() {
           version: '0.2.0',
           apiVersion: 2,
           minClientApiVersion: 1,
+          databaseReady: true,
         ),
       );
 
@@ -48,6 +50,7 @@ void main() {
           version: '0.0.5',
           apiVersion: 0,
           minClientApiVersion: 0,
+          databaseReady: true,
         ),
       );
 
@@ -61,6 +64,7 @@ void main() {
           version: '0.2.0',
           apiVersion: 2,
           minClientApiVersion: 2,
+          databaseReady: true,
         ),
       );
 
@@ -68,19 +72,19 @@ void main() {
     });
   });
 
-  group('ProjectSummary', () {
-    test('parses project json', () {
-      final project = ProjectSummary.fromJson(const {
-        'id': 'project-1',
+  group('SiteSummary', () {
+    test('parses site json', () {
+      final site = SiteSummary.fromJson(const {
+        'id': 'site-1',
         'slug': 'default',
         'name': 'Default',
-        'description': 'Default project',
+        'description': 'Default site',
       });
 
-      expect(project.id, 'project-1');
-      expect(project.slug, 'default');
-      expect(project.name, 'Default');
-      expect(project.description, 'Default project');
+      expect(site.id, 'site-1');
+      expect(site.slug, 'default');
+      expect(site.name, 'Default');
+      expect(site.description, 'Default site');
     });
   });
 }

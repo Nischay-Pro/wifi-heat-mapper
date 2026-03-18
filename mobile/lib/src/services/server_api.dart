@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:mobile/src/models/project_summary.dart';
+import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/models/server_info.dart';
 
 const clientName = 'whm-mobile';
@@ -18,6 +18,18 @@ class CompatibilityResult {
 
   final bool isCompatible;
   final String? message;
+}
+
+class ApiException implements Exception {
+  const ApiException({
+    required this.message,
+    required this.statusCode,
+    this.code,
+  });
+
+  final String message;
+  final int statusCode;
+  final String? code;
 }
 
 class ServerApi {
@@ -89,49 +101,81 @@ class ServerApi {
 
       final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
       final serverJson = decoded['server'];
+      final readinessJson = decoded['readiness'];
 
       if (serverJson is! Map<String, dynamic>) {
         throw const FormatException('Server info payload is missing the server object.');
       }
 
-      return ServerInfo.fromJson(serverJson);
+      final databaseReady =
+          readinessJson is Map<String, dynamic> ? readinessJson['database'] == true : true;
+
+      return ServerInfo.fromJson(
+        serverJson,
+        databaseReady: databaseReady,
+      );
     } finally {
       httpClient.close();
     }
   }
 
-  Future<List<ProjectSummary>> fetchProjects(String serverUrl) async {
+  Future<List<SiteSummary>> fetchSites(String serverUrl) async {
     final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
-    final projectsUri = baseUri.replace(
-      path: '${baseUri.path}/api/projects'.replaceAll('//', '/'),
+    final sitesUri = baseUri.replace(
+      path: '${baseUri.path}/api/sites'.replaceAll('//', '/'),
     );
 
     final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
 
     try {
-      final request = await httpClient.getUrl(projectsUri).timeout(serverConnectionTimeout);
+      final request = await httpClient.getUrl(sitesUri).timeout(serverConnectionTimeout);
       final response = await request.close().timeout(serverConnectionTimeout);
       final responseBody = await utf8.decodeStream(response);
 
       if (response.statusCode != HttpStatus.ok) {
-        throw HttpException(
-          'Server returned ${response.statusCode} for ${projectsUri.path}',
-          uri: projectsUri,
+        throw _parseApiException(
+          responseBody: responseBody,
+          statusCode: response.statusCode,
+          fallbackMessage: 'Server returned ${response.statusCode} for ${sitesUri.path}',
         );
       }
 
       final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
-      final projectsJson = decoded['projects'];
+      final sitesJson = decoded['sites'];
 
-      if (projectsJson is! List) {
-        throw const FormatException('Projects payload is missing the projects list.');
+      if (sitesJson is! List) {
+        throw const FormatException('Sites payload is missing the sites list.');
       }
 
-      return projectsJson
-          .map((project) => ProjectSummary.fromJson(project as Map<String, dynamic>))
+      return sitesJson
+          .map((site) => SiteSummary.fromJson(site as Map<String, dynamic>))
           .toList(growable: false);
     } finally {
       httpClient.close();
     }
+  }
+
+  ApiException _parseApiException({
+    required String responseBody,
+    required int statusCode,
+    required String fallbackMessage,
+  }) {
+    try {
+      final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+      final errorJson = decoded['error'];
+
+      if (errorJson is Map<String, dynamic>) {
+        return ApiException(
+          message: errorJson['message'] as String? ?? fallbackMessage,
+          statusCode: statusCode,
+          code: (errorJson['details'] as Map<String, dynamic>?)?['code'] as String?,
+        );
+      }
+    } catch (_) {}
+
+    return ApiException(
+      message: fallbackMessage,
+      statusCode: statusCode,
+    );
   }
 }

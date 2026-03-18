@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
-import 'package:mobile/src/models/project_summary.dart';
+import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/services/server_api.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -33,7 +33,7 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
   ServerConnectionState build() {
     return ServerConnectionState.initial(
       draftServerUrl: _preferences.getServerUrl() ?? 'http://localhost:5173',
-      selectedProjectSlug: _preferences.getSelectedProjectSlug(),
+      selectedSiteSlug: _preferences.getSelectedSiteSlug(),
     );
   }
 
@@ -44,7 +44,7 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
       clearStatusMessage: true,
       clearConnectedServerUrl: true,
       clearServerInfo: true,
-      projects: const [],
+      sites: const [],
     );
   }
 
@@ -54,12 +54,21 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
       clearStatusMessage: true,
       clearConnectedServerUrl: true,
       clearServerInfo: true,
-      projects: const [],
+      sites: const [],
     );
 
     try {
       final serverUrl = _serverApi.normalizeServerUrl(state.draftServerUrl);
       final serverInfo = await _serverApi.fetchServerInfo(serverUrl);
+      if (!serverInfo.databaseReady) {
+        state = state.copyWith(
+          status: ConnectionStatus.serverNotReady,
+          statusMessage:
+              'The WHM server is reachable, but it is not ready yet. Check that the database is running and migrations have been applied.',
+        );
+        return;
+      }
+
       final compatibility = _serverApi.checkServerCompatibility(serverInfo);
 
       if (!compatibility.isCompatible) {
@@ -70,17 +79,17 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
         return;
       }
 
-      final projects = await _serverApi.fetchProjects(serverUrl);
-      final selectedProjectSlug = _resolveSelectedProjectSlug(
-        projects: projects,
-        preferredSlug: _preferences.getSelectedProjectSlug(),
+      final sites = await _serverApi.fetchSites(serverUrl);
+      final selectedSiteSlug = _resolveSelectedSiteSlug(
+        sites: sites,
+        preferredSlug: _preferences.getSelectedSiteSlug(),
       );
 
       await _preferences.setServerUrl(serverUrl);
-      if (selectedProjectSlug == null) {
-        await _preferences.clearSelectedProjectSlug();
+      if (selectedSiteSlug == null) {
+        await _preferences.clearSelectedSiteSlug();
       } else {
-        await _preferences.setSelectedProjectSlug(selectedProjectSlug);
+        await _preferences.setSelectedSiteSlug(selectedSiteSlug);
       }
 
       state = state.copyWith(
@@ -90,12 +99,27 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
             '(server API ${serverInfo.apiVersion}, client API $clientApiVersion).',
         connectedServerUrl: serverUrl,
         serverInfo: serverInfo,
-        projects: projects,
-        selectedProjectSlug: selectedProjectSlug,
+        sites: sites,
+        selectedSiteSlug: selectedSiteSlug,
       );
     } on FormatException catch (error) {
       state = state.copyWith(
         status: ConnectionStatus.invalidUrl,
+        statusMessage: error.message,
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == HttpStatus.serviceUnavailable ||
+          error.code == 'database_unavailable') {
+        state = state.copyWith(
+          status: ConnectionStatus.serverNotReady,
+          statusMessage:
+              'The WHM server is reachable, but it is not ready yet. Check that the database is running and migrations have been applied.',
+        );
+        return;
+      }
+
+      state = state.copyWith(
+        status: ConnectionStatus.serverError,
         statusMessage: error.message,
       );
     } on HttpException {
@@ -124,21 +148,21 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
     }
   }
 
-  Future<void> selectProject(String projectSlug) async {
-    await _preferences.setSelectedProjectSlug(projectSlug);
-    state = state.copyWith(selectedProjectSlug: projectSlug);
+  Future<void> selectSite(String siteSlug) async {
+    await _preferences.setSelectedSiteSlug(siteSlug);
+    state = state.copyWith(selectedSiteSlug: siteSlug);
   }
 
-  String? _resolveSelectedProjectSlug({
-    required List<ProjectSummary> projects,
+  String? _resolveSelectedSiteSlug({
+    required List<SiteSummary> sites,
     required String? preferredSlug,
   }) {
     if (preferredSlug == null) {
       return null;
     }
 
-    for (final project in projects) {
-      if (project.slug == preferredSlug) {
+    for (final site in sites) {
+      if (site.slug == preferredSlug) {
         return preferredSlug;
       }
     }

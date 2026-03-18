@@ -1,4 +1,4 @@
-import 'package:mobile/src/models/project_summary.dart';
+import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/models/server_info.dart';
 
 enum ConnectionStatus {
@@ -9,6 +9,7 @@ enum ConnectionStatus {
   networkError,
   timeout,
   incompatibleServer,
+  serverNotReady,
   serverError,
 }
 
@@ -16,19 +17,19 @@ class ServerConnectionState {
   const ServerConnectionState({
     required this.status,
     required this.draftServerUrl,
-    required this.projects,
+    required this.sites,
     this.statusMessage,
     this.connectedServerUrl,
     this.serverInfo,
-    this.selectedProjectSlug,
+    this.selectedSiteSlug,
   });
 
-  factory ServerConnectionState.initial({required String draftServerUrl, String? selectedProjectSlug}) {
+  factory ServerConnectionState.initial({required String draftServerUrl, String? selectedSiteSlug}) {
     return ServerConnectionState(
       status: ConnectionStatus.idle,
       draftServerUrl: draftServerUrl,
-      projects: const [],
-      selectedProjectSlug: selectedProjectSlug,
+      sites: const [],
+      selectedSiteSlug: selectedSiteSlug,
     );
   }
 
@@ -37,8 +38,8 @@ class ServerConnectionState {
   final String? statusMessage;
   final String? connectedServerUrl;
   final ServerInfo? serverInfo;
-  final List<ProjectSummary> projects;
-  final String? selectedProjectSlug;
+  final List<SiteSummary> sites;
+  final String? selectedSiteSlug;
 
   bool get isConnected => status == ConnectionStatus.connected;
   bool get isConnecting => status == ConnectionStatus.connecting;
@@ -57,9 +58,9 @@ class ServerConnectionState {
     bool clearConnectedServerUrl = false,
     ServerInfo? serverInfo,
     bool clearServerInfo = false,
-    List<ProjectSummary>? projects,
-    String? selectedProjectSlug,
-    bool clearSelectedProjectSlug = false,
+    List<SiteSummary>? sites,
+    String? selectedSiteSlug,
+    bool clearSelectedSiteSlug = false,
   }) {
     return ServerConnectionState(
       status: status ?? this.status,
@@ -68,9 +69,9 @@ class ServerConnectionState {
       connectedServerUrl:
           clearConnectedServerUrl ? null : connectedServerUrl ?? this.connectedServerUrl,
       serverInfo: clearServerInfo ? null : serverInfo ?? this.serverInfo,
-      projects: projects ?? this.projects,
-      selectedProjectSlug:
-          clearSelectedProjectSlug ? null : selectedProjectSlug ?? this.selectedProjectSlug,
+      sites: sites ?? this.sites,
+      selectedSiteSlug:
+          clearSelectedSiteSlug ? null : selectedSiteSlug ?? this.selectedSiteSlug,
     );
   }
 }

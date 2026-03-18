@@ -1,5 +1,5 @@
-class ProjectSummary {
-  const ProjectSummary({
+class SiteSummary {
+  const SiteSummary({
     required this.id,
     required this.slug,
     required this.name,
@@ -11,8 +11,8 @@ class ProjectSummary {
   final String name;
   final String? description;
 
-  factory ProjectSummary.fromJson(Map<String, dynamic> json) {
-    return ProjectSummary(
+  factory SiteSummary.fromJson(Map<String, dynamic> json) {
+    return SiteSummary(
       id: json['id'] as String,
       slug: json['slug'] as String,
       name: json['name'] as String,

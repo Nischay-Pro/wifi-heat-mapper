@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
-import 'package:mobile/src/models/project_summary.dart';
+import 'package:mobile/src/models/site_summary.dart';
 
-class ProjectsPage extends ConsumerWidget {
-  const ProjectsPage({super.key});
+class SitesPage extends ConsumerWidget {
+  const SitesPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,7 +16,7 @@ class ProjectsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Available projects'),
+        title: const Text('Available sites'),
       ),
       body: SafeArea(
         child: Align(
@@ -34,21 +34,21 @@ class ProjectsPage extends ConsumerWidget {
                       style: textTheme.bodySmall,
                     ),
                   ),
-                if (connectionState.projects.isEmpty)
+                if (connectionState.sites.isEmpty)
                   Card(
                     child: Padding(
                       padding: EdgeInsets.all(spacing.regular),
-                      child: const Text('No projects are available on this server.'),
+                      child: const Text('No sites are available on this server.'),
                     ),
                   )
                 else
-                  ...connectionState.projects.map(
-                    (project) => Padding(
+                  ...connectionState.sites.map(
+                    (site) => Padding(
                       padding: EdgeInsets.only(bottom: spacing.compact),
-                      child: _ProjectTile(
-                        project: project,
-                        isSelected: connectionState.selectedProjectSlug == project.slug,
-                        onSelect: () => controller.selectProject(project.slug),
+                      child: _SiteTile(
+                        site: site,
+                        isSelected: connectionState.selectedSiteSlug == site.slug,
+                        onSelect: () => controller.selectSite(site.slug),
                       ),
                     ),
                   ),
@@ -57,7 +57,7 @@ class ProjectsPage extends ConsumerWidget {
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Change server'),
                 ),
-                if (connectionState.selectedProjectSlug != null) ...[
+                if (connectionState.selectedSiteSlug != null) ...[
                   SizedBox(height: spacing.regular),
                   Card(
                     child: Padding(
@@ -68,7 +68,7 @@ class ProjectsPage extends ConsumerWidget {
                           SizedBox(width: spacing.compact),
                           Expanded(
                             child: Text(
-                              'Selected project: ${connectionState.selectedProjectSlug}',
+                              'Selected site: ${connectionState.selectedSiteSlug}',
                               style: textTheme.bodyMedium,
                             ),
                           ),
@@ -86,14 +86,14 @@ class ProjectsPage extends ConsumerWidget {
   }
 }
 
-class _ProjectTile extends StatelessWidget {
-  const _ProjectTile({
-    required this.project,
+class _SiteTile extends StatelessWidget {
+  const _SiteTile({
+    required this.site,
     required this.isSelected,
     required this.onSelect,
   });
 
-  final ProjectSummary project;
+  final SiteSummary site;
   final bool isSelected;
   final VoidCallback onSelect;
 
@@ -106,15 +106,15 @@ class _ProjectTile extends StatelessWidget {
     return Card(
       child: ListTile(
         onTap: onSelect,
-        title: Text(project.name),
+        title: Text(site.name),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(project.slug, style: textTheme.bodySmall),
-            if (project.description != null && project.description!.isNotEmpty) ...[
+            Text(site.slug, style: textTheme.bodySmall),
+            if (site.description != null && site.description!.isNotEmpty) ...[
               SizedBox(height: spacing.compact / 2),
-              Text(project.description!),
+              Text(site.description!),
             ],
           ],
         ),

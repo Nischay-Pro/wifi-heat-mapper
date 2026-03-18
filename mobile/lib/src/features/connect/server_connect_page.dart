@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
-import 'package:mobile/src/features/projects/projects_page.dart';
+import 'package:mobile/src/features/sites/sites_page.dart';
 import 'package:mobile/src/services/server_api.dart';
 
 class ServerConnectPage extends ConsumerStatefulWidget {
@@ -44,7 +44,7 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
     }
 
     await Navigator.of(context).push(
-      platformPageRoute<void>(const ProjectsPage()),
+      platformPageRoute<void>(const SitesPage()),
     );
   }
 
@@ -70,7 +70,7 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
                 Text('Connect to server', style: textTheme.headlineMedium),
                 SizedBox(height: spacing.compact),
                 Text(
-                  'Enter the WHM server URL to validate compatibility before loading project data.',
+                  'Enter the WHM server URL to validate compatibility before loading site data.',
                   style: textTheme.bodyMedium,
                 ),
                 SizedBox(height: spacing.comfortable),

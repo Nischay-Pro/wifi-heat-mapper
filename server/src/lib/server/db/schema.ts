@@ -31,7 +31,7 @@ export interface ThroughputResult {
 	upload_size?: number;
 }
 
-export interface ProjectsTable {
+export interface SitesTable {
 	id: Generated<string>;
 	slug: string;
 	name: string;
@@ -42,7 +42,7 @@ export interface ProjectsTable {
 
 export interface FloorMapsTable {
 	id: Generated<string>;
-	project_id: string;
+	site_id: string;
 	name: string;
 	image_path: string | null;
 	image_width: number | null;
@@ -53,7 +53,7 @@ export interface FloorMapsTable {
 
 export interface PointsTable {
 	id: Generated<string>;
-	project_id: string;
+	site_id: string;
 	label: string | null;
 	x: number;
 	y: number;
@@ -74,7 +74,7 @@ export interface DevicesTable {
 
 export interface MeasurementSessionsTable {
 	id: Generated<string>;
-	project_id: string;
+	site_id: string;
 	name: string;
 	started_at: Timestamp;
 	ended_at: Timestamp | null;
@@ -83,7 +83,7 @@ export interface MeasurementSessionsTable {
 
 export interface MeasurementsTable {
 	id: Generated<string>;
-	project_id: string;
+	site_id: string;
 	point_id: string;
 	device_id: string;
 	session_id: string | null;
@@ -100,7 +100,7 @@ export interface Database {
 	measurement_sessions: MeasurementSessionsTable;
 	measurements: MeasurementsTable;
 	points: PointsTable;
-	projects: ProjectsTable;
+	sites: SitesTable;
 }
 
 function requireDatabaseUrl(): string {

@@ -1,11 +1,11 @@
 import { getDb } from "$lib/server/db/schema";
 
-export async function listMeasurements(limit = 100, projectId?: string) {
+export async function listMeasurements(limit = 100, siteId?: string) {
 	const db = getDb();
 
 	let query = db
 		.selectFrom("measurements")
-		.innerJoin("projects", "projects.id", "measurements.project_id")
+		.innerJoin("sites", "sites.id", "measurements.site_id")
 		.innerJoin("points", "points.id", "measurements.point_id")
 		.innerJoin("devices", "devices.id", "measurements.device_id")
 		.leftJoin("measurement_sessions", "measurement_sessions.id", "measurements.session_id")
@@ -15,9 +15,9 @@ export async function listMeasurements(limit = 100, projectId?: string) {
 			"measurements.wifi",
 			"measurements.local_result",
 			"measurements.internet_result",
-			"projects.id as project_id",
-			"projects.slug as project_slug",
-			"projects.name as project_name",
+			"sites.id as site_id",
+			"sites.slug as site_slug",
+			"sites.name as site_name",
 			"points.id as point_id",
 			"points.label as point_label",
 			"points.x as point_x",
@@ -34,8 +34,8 @@ export async function listMeasurements(limit = 100, projectId?: string) {
 		.orderBy("measurements.measured_at", "desc")
 		.limit(limit);
 
-	if (projectId) {
-		query = query.where("measurements.project_id", "=", projectId);
+	if (siteId) {
+		query = query.where("measurements.site_id", "=", siteId);
 	}
 
 	return query.execute();
