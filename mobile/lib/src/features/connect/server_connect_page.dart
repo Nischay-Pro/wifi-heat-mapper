@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
+import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/sites/sites_page.dart';
@@ -87,7 +88,7 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
                 FilledButton(
                   onPressed: connectionState.isConnecting ? null : _handleConnect,
                   child: connectionState.isConnecting
-                      ? const CircularProgressIndicator.adaptive()
+                      ? const LoadingIndicator.small()
                       : const Text('Connect'),
                 ),
                 SizedBox(height: spacing.regular),

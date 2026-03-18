@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/wifi_metadata.dart';
@@ -129,10 +130,7 @@ class MeasurementsView extends StatelessWidget {
             onPressed: isLoading ? null : onRefresh,
             tooltip: 'Refresh Wi-Fi details',
             icon: isLoading
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                  )
+                ? const LoadingIndicator.small()
                 : const Icon(Icons.refresh),
           ),
         ],
@@ -165,7 +163,7 @@ class MeasurementsView extends StatelessWidget {
                         padding: EdgeInsets.all(spacing.regular),
                         child: Row(
                           children: [
-                            const CircularProgressIndicator.adaptive(),
+                            const LoadingIndicator.medium(),
                             SizedBox(width: spacing.regular),
                             Expanded(
                               child: Text(

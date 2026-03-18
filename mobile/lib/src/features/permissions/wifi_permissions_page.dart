@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
+import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
@@ -119,10 +120,7 @@ class WifiPermissionsView extends StatelessWidget {
             onPressed: isRefreshing ? null : onRefresh,
             tooltip: 'Refresh permission status',
             icon: isRefreshing
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                  )
+                ? const LoadingIndicator.small()
                 : const Icon(Icons.refresh),
           ),
         ],
@@ -156,7 +154,7 @@ class WifiPermissionsView extends StatelessWidget {
                 SizedBox(height: spacing.regular),
                 if (isLoading)
                   const Center(
-                    child: CircularProgressIndicator.adaptive(),
+                    child: LoadingIndicator.medium(),
                   )
                 else
                   ...requirements.map(

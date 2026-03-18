@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
+import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/material_spacing.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
@@ -84,10 +85,7 @@ class SitesView extends StatelessWidget {
             onPressed: connectionState.isConnecting ? null : onRefreshSites,
             tooltip: 'Refresh sites',
             icon: connectionState.isConnecting
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
-                  )
+                ? const LoadingIndicator.small()
                 : const Icon(Icons.refresh),
           ),
         ],
