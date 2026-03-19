@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
+import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
@@ -21,28 +24,99 @@ class _WifiPermissionsPageState extends ConsumerState<WifiPermissionsPage>
   List<WifiPermissionRequirement> _requirements = const [];
   bool _isLoading = true;
   bool _isActing = false;
+  Timer? _pollTimer;
+  bool _isPolling = false;
+  bool _isNavigatingToShell = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _refreshRequirements();
+    _startPolling();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _pollServerState();
       _refreshRequirements();
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _pollServerState(),
+    );
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _pollServerState() async {
+    if (_isPolling) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      final validation =
+          await ref.read(serverConnectionControllerProvider.notifier).validateActiveConnection();
+      if (!mounted) {
+        return;
+      }
+
+      if (!validation.serverAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppMessages.serverUnavailable),
+          ),
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+
+      if (!validation.selectedSiteValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppMessages.invalidSelectedSite),
+          ),
+        );
+        Navigator.of(context).popUntil(
+          (route) => route.settings.name == sitesRouteName || route.isFirst,
+        );
+      }
+    } finally {
+      _isPolling = false;
     }
   }
 
   Future<void> _refreshRequirements() async {
+    if (_isNavigatingToShell) {
+      return;
+    }
+
     final service = ref.read(wifiPermissionServiceProvider);
     final requirements = await service.loadRequirements();
     final connectionState = ref.read(serverConnectionControllerProvider);
@@ -59,9 +133,12 @@ class _WifiPermissionsPageState extends ConsumerState<WifiPermissionsPage>
     });
 
     if (allGranted && connectionState.selectedSiteSlug != null) {
+      _isNavigatingToShell = true;
+      _stopPolling();
       await Navigator.of(context).pushReplacement(
         platformPageRoute<void>(
           SiteShellPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
+          settings: const RouteSettings(name: siteShellRouteName),
         ),
       );
     }
@@ -155,12 +232,6 @@ class WifiPermissionsView extends StatelessWidget {
                   ),
                 ),
               ),
-            SizedBox(height: tokens.sectionGap),
-            const AppBanner(
-              icon: Icons.info_outline,
-              message:
-                  'If the app sends you to system settings, come back here after changing it. This screen refreshes its status when the app resumes.',
-            ),
           ],
         ),
       ),

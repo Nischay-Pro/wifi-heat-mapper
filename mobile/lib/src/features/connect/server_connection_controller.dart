@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
 import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/services/server_api.dart';
@@ -24,6 +25,16 @@ final serverConnectionControllerProvider =
     NotifierProvider<ServerConnectionController, ServerConnectionState>(
   ServerConnectionController.new,
 );
+
+class BackgroundValidationResult {
+  const BackgroundValidationResult({
+    required this.serverAvailable,
+    required this.selectedSiteValid,
+  });
+
+  final bool serverAvailable;
+  final bool selectedSiteValid;
+}
 
 class ServerConnectionController extends Notifier<ServerConnectionState> {
   AppPreferences get _preferences => ref.read(appPreferencesProvider);
@@ -63,8 +74,7 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
       if (!serverInfo.databaseReady) {
         state = state.copyWith(
           status: ConnectionStatus.serverNotReady,
-          statusMessage:
-              'The WHM server is reachable, but it is not ready yet. Check that the database is running and migrations have been applied.',
+          statusMessage: AppMessages.serverNotReady,
         );
         return;
       }
@@ -112,8 +122,7 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
           error.code == 'database_unavailable') {
         state = state.copyWith(
           status: ConnectionStatus.serverNotReady,
-          statusMessage:
-              'The WHM server is reachable, but it is not ready yet. Check that the database is running and migrations have been applied.',
+          statusMessage: AppMessages.serverNotReady,
         );
         return;
       }
@@ -151,6 +160,49 @@ class ServerConnectionController extends Notifier<ServerConnectionState> {
   Future<void> selectSite(String siteSlug) async {
     await _preferences.setSelectedSiteSlug(siteSlug);
     state = state.copyWith(selectedSiteSlug: siteSlug);
+  }
+
+  Future<BackgroundValidationResult> validateActiveConnection() async {
+    final serverUrl = state.connectedServerUrl;
+    if (serverUrl == null || serverUrl.isEmpty) {
+      return const BackgroundValidationResult(
+        serverAvailable: false,
+        selectedSiteValid: false,
+      );
+    }
+
+    try {
+      final serverInfo = await _serverApi.fetchServerInfo(serverUrl);
+      if (!serverInfo.databaseReady) {
+        return const BackgroundValidationResult(
+          serverAvailable: false,
+          selectedSiteValid: false,
+        );
+      }
+
+      final compatibility = _serverApi.checkServerCompatibility(serverInfo);
+      if (!compatibility.isCompatible) {
+        return const BackgroundValidationResult(
+          serverAvailable: false,
+          selectedSiteValid: false,
+        );
+      }
+
+      final sites = await _serverApi.fetchSites(serverUrl);
+      final selectedSiteSlug = state.selectedSiteSlug;
+      final selectedSiteValid = selectedSiteSlug != null &&
+          sites.any((site) => site.slug == selectedSiteSlug);
+
+      return BackgroundValidationResult(
+        serverAvailable: true,
+        selectedSiteValid: selectedSiteValid,
+      );
+    } catch (_) {
+      return const BackgroundValidationResult(
+        serverAvailable: false,
+        selectedSiteValid: false,
+      );
+    }
   }
 
   String? _resolveSelectedSiteSlug({

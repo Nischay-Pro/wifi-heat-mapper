@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
+import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/app_shell/site_shell_page.dart';
@@ -10,11 +13,92 @@ import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
 import 'package:mobile/src/models/site_summary.dart';
 
-class SitesPage extends ConsumerWidget {
+class SitesPage extends ConsumerStatefulWidget {
   const SitesPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SitesPage> createState() => _SitesPageState();
+}
+
+class _SitesPageState extends ConsumerState<SitesPage> with WidgetsBindingObserver {
+  Timer? _pollTimer;
+  bool _isPolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _pollServerState();
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _pollServerState(),
+    );
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _pollServerState() async {
+    if (_isPolling) {
+      return;
+    }
+    if (!(ModalRoute.of(context)?.isCurrent ?? false)) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      final validation =
+          await ref.read(serverConnectionControllerProvider.notifier).validateActiveConnection();
+      if (!mounted) {
+        return;
+      }
+
+      if (!validation.serverAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppMessages.serverUnavailable),
+          ),
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } finally {
+      _isPolling = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final connectionState = ref.watch(serverConnectionControllerProvider);
     final controller = ref.read(serverConnectionControllerProvider.notifier);
     final wifiPermissionService = ref.read(wifiPermissionServiceProvider);
@@ -37,13 +121,17 @@ class SitesPage extends ConsumerWidget {
           await Navigator.of(context).push(
             platformPageRoute<void>(
               SiteShellPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
+              settings: const RouteSettings(name: siteShellRouteName),
             ),
           );
           return;
         }
 
         await Navigator.of(context).push(
-          platformPageRoute<void>(const WifiPermissionsPage()),
+          platformPageRoute<void>(
+            const WifiPermissionsPage(),
+            settings: const RouteSettings(name: wifiPermissionsRouteName),
+          ),
         );
       },
       onChangeServer: () => Navigator.of(context).pop(),
@@ -103,7 +191,7 @@ class SitesView extends StatelessWidget {
             if (connectionState.sites.isEmpty)
               const AppBanner(
                 icon: Icons.info_outline,
-                message: 'No sites are available on this server.',
+                message: AppMessages.noSitesAvailable,
               )
             else
               ...connectionState.sites.map(
@@ -126,11 +214,6 @@ class SitesView extends StatelessWidget {
               FilledButton(
                 onPressed: onContinue,
                 child: const Text('Continue'),
-              ),
-              SizedBox(height: tokens.spacing.regular),
-              const AppBanner(
-                icon: Icons.check_circle_outline,
-                message: 'A site is selected and ready for measurement.',
               ),
             ],
           ],
@@ -158,9 +241,13 @@ class _SiteTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return AppPanel(
-      padding: EdgeInsets.all(tokens.spacing.compact),
+      padding: EdgeInsets.zero,
       child: ListTile(
         onTap: onSelect,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: tokens.spacing.regular,
+          vertical: tokens.spacing.compact,
+        ),
         title: Text(site.name),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

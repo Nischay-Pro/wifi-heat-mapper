@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
@@ -21,10 +22,12 @@ class MeasurementsPage extends ConsumerStatefulWidget {
     super.key,
     required this.selectedSiteSlug,
     this.showScaffold = true,
+    this.onOpenSiteSettings,
   });
 
   final String selectedSiteSlug;
   final bool showScaffold;
+  final VoidCallback? onOpenSiteSettings;
 
   @override
   ConsumerState<MeasurementsPage> createState() => _MeasurementsPageState();
@@ -201,7 +204,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
           _measurementSubmissionMessage =
-              'Measurement captured locally, but no connected server URL is available for upload.';
+              AppMessages.measurementCapturedNoServer;
         });
         return;
       }
@@ -230,7 +233,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _lastRecordedAt = measuredAt;
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
-          _measurementSubmissionMessage = 'Measurement uploaded to the WHM server.';
+          _measurementSubmissionMessage = AppMessages.measurementUploaded;
         });
         return;
       } on ApiException catch (error) {
@@ -328,6 +331,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       selectedSiteSlug: widget.selectedSiteSlug,
       seededPointId: _seededPointId,
       showScaffold: widget.showScaffold,
+      onOpenSiteSettings: widget.onOpenSiteSettings,
       wifiMetadata: _wifiMetadata,
       internetResult: _internetResult,
       internetProgress: _internetProgress,
@@ -352,6 +356,7 @@ class MeasurementsView extends StatelessWidget {
     required this.selectedSiteSlug,
     required this.seededPointId,
     required this.showScaffold,
+    required this.onOpenSiteSettings,
     required this.wifiMetadata,
     required this.internetResult,
     required this.internetProgress,
@@ -370,6 +375,7 @@ class MeasurementsView extends StatelessWidget {
   final String selectedSiteSlug;
   final String seededPointId;
   final bool showScaffold;
+  final VoidCallback? onOpenSiteSettings;
   final WifiMetadata wifiMetadata;
   final InternetMeasurementResult? internetResult;
   final InternetSpeedTestProgress internetProgress;
@@ -413,6 +419,7 @@ class MeasurementsView extends StatelessWidget {
       children: [
         _MeasurementHeader(
           selectedSiteSlug: selectedSiteSlug,
+          onOpenSiteSettings: onOpenSiteSettings,
           wifiMetadata: wifiMetadata,
           isRefreshing: isLoading || isRefreshing,
           onRefresh: onRefresh,
@@ -784,17 +791,12 @@ class MeasurementsView extends StatelessWidget {
 
   String _statusMessage(WifiMetadataStatus status) {
     return switch (status) {
-      WifiMetadataStatus.available => 'Wi-Fi metadata is available.',
-      WifiMetadataStatus.wifiDisabled =>
-        'Wi-Fi is turned off. Turn on Wi-Fi to collect Wi-Fi metadata.',
-      WifiMetadataStatus.wifiNotConnected =>
-        'Wi-Fi is not connected. Join a Wi-Fi network to continue.',
-      WifiMetadataStatus.permissionsMissing =>
-        'Wi-Fi permissions are missing. Grant the required access to collect Wi-Fi metadata.',
-      WifiMetadataStatus.unsupportedPlatform =>
-        'Wi-Fi metadata collection is not supported on this platform yet.',
-      WifiMetadataStatus.unavailable =>
-        'No Wi-Fi metadata is available from the device right now.',
+      WifiMetadataStatus.available => AppMessages.wifiAvailable,
+      WifiMetadataStatus.wifiDisabled => AppMessages.wifiDisabled,
+      WifiMetadataStatus.wifiNotConnected => AppMessages.wifiNotConnected,
+      WifiMetadataStatus.permissionsMissing => AppMessages.wifiPermissionsMissing,
+      WifiMetadataStatus.unsupportedPlatform => AppMessages.wifiUnsupportedPlatform,
+      WifiMetadataStatus.unavailable => AppMessages.wifiUnavailable,
     };
   }
 }
@@ -802,12 +804,14 @@ class MeasurementsView extends StatelessWidget {
 class _MeasurementHeader extends StatelessWidget {
   const _MeasurementHeader({
     required this.selectedSiteSlug,
+    required this.onOpenSiteSettings,
     required this.wifiMetadata,
     required this.isRefreshing,
     required this.onRefresh,
   });
 
   final String selectedSiteSlug;
+  final VoidCallback? onOpenSiteSettings;
   final WifiMetadata wifiMetadata;
   final bool isRefreshing;
   final Future<void> Function() onRefresh;
@@ -824,36 +828,43 @@ class _MeasurementHeader extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: AppPanel(
-                padding: EdgeInsets.symmetric(
-                  horizontal: tokens.spacing.regular,
-                  vertical: tokens.spacing.compact,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.bolt,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: Text(
-                        selectedSiteSlug,
-                        style: textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
+              child: GestureDetector(
+                onTap: onOpenSiteSettings,
+                child: AppPanel(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: tokens.spacing.regular,
+                    vertical: tokens.spacing.compact,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        child: Icon(
+                          Icons.bolt,
+                          color: colorScheme.primary,
+                        ),
                       ),
-                    ),
-                  ],
+                      SizedBox(width: tokens.spacing.compact),
+                      Expanded(
+                        child: Text(
+                          selectedSiteSlug,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

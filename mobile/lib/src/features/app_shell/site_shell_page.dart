@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobile/src/app/platform_route.dart';
 import 'package:mobile/src/app/theme_mode_controller.dart';
+import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
+import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
+import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
+import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
 
 class SiteShellPage extends ConsumerStatefulWidget {
@@ -19,25 +26,164 @@ class SiteShellPage extends ConsumerStatefulWidget {
   ConsumerState<SiteShellPage> createState() => _SiteShellPageState();
 }
 
-class _SiteShellPageState extends ConsumerState<SiteShellPage> {
+class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  Timer? _pollTimer;
+  bool _isPolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+      _pollServerState();
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _pollServerState(),
+    );
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  Future<void> _pollServerState() async {
+    if (_isPolling) {
+      return;
+    }
+
+    _isPolling = true;
+
+    try {
+      final validation =
+          await ref.read(serverConnectionControllerProvider.notifier).validateActiveConnection();
+      if (!mounted) {
+        return;
+      }
+
+      if (!validation.serverAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppMessages.serverUnavailable),
+          ),
+        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        return;
+      }
+
+      final requirementsMet = await ref.read(wifiPermissionServiceProvider).areRequirementsMet();
+      if (!mounted) {
+        return;
+      }
+
+      if (!requirementsMet) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppMessages.wifiPermissionsMissing),
+          ),
+        );
+        await Navigator.of(context).pushReplacement(
+          platformPageRoute<void>(
+            const WifiPermissionsPage(),
+            settings: const RouteSettings(name: wifiPermissionsRouteName),
+          ),
+        );
+        return;
+      }
+
+      if (!validation.selectedSiteValid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(AppMessages.invalidSelectedSite),
+          ),
+        );
+        Navigator.of(context).popUntil(
+          (route) => route.settings.name == sitesRouteName || route.isFirst,
+        );
+      }
+    } finally {
+      _isPolling = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final connectionState = ref.watch(serverConnectionControllerProvider);
+    final currentSelectedSiteSlug = connectionState.sites.any(
+      (site) => site.slug == connectionState.selectedSiteSlug,
+    )
+        ? connectionState.selectedSiteSlug
+        : null;
 
     return Scaffold(
       body: SafeArea(
         child: IndexedStack(
           index: _selectedIndex,
           children: [
-            MeasurementsPage(
-              selectedSiteSlug: widget.selectedSiteSlug,
-              showScaffold: false,
-            ),
+            if (currentSelectedSiteSlug == null)
+              _MissingSelectedSiteView(
+                onOpenSettings: () {
+                  setState(() {
+                    _selectedIndex = 1;
+                  });
+                },
+              )
+            else
+              MeasurementsPage(
+                selectedSiteSlug: currentSelectedSiteSlug,
+                showScaffold: false,
+                onOpenSiteSettings: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => SiteSettingsPage(
+                        selectedSiteSlug: currentSelectedSiteSlug,
+                        sites: connectionState.sites,
+                        isRefreshingSites: connectionState.isConnecting,
+                        onRefreshSites: ref.read(serverConnectionControllerProvider.notifier).connect,
+                        onSelectSite: (siteSlug) async {
+                          await ref.read(serverConnectionControllerProvider.notifier).selectSite(siteSlug);
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
             _SettingsTab(
-              selectedSiteSlug: widget.selectedSiteSlug,
+              selectedSiteSlug: currentSelectedSiteSlug,
+              sites: connectionState.sites,
               connectedServerUrl: connectionState.connectedServerUrl,
+              isRefreshingSites: connectionState.isConnecting,
+              onRefreshSites: ref.read(serverConnectionControllerProvider.notifier).connect,
+              onSelectSite: (siteSlug) async {
+                await ref.read(serverConnectionControllerProvider.notifier).selectSite(siteSlug);
+              },
               onChangeServer: () => Navigator.of(context).popUntil((route) => route.isFirst),
             ),
           ],
@@ -165,12 +311,20 @@ class _ShellDestination {
 class _SettingsTab extends ConsumerWidget {
   const _SettingsTab({
     required this.selectedSiteSlug,
+    required this.sites,
     required this.connectedServerUrl,
+    required this.isRefreshingSites,
+    required this.onRefreshSites,
+    required this.onSelectSite,
     required this.onChangeServer,
   });
 
-  final String selectedSiteSlug;
+  final String? selectedSiteSlug;
+  final List<SiteSummary> sites;
   final String? connectedServerUrl;
+  final bool isRefreshingSites;
+  final Future<void> Function() onRefreshSites;
+  final ValueChanged<String> onSelectSite;
   final VoidCallback onChangeServer;
 
   @override
@@ -217,12 +371,16 @@ class _SettingsTab extends ConsumerWidget {
             AppSettingsRow(
               icon: Icons.location_on_outlined,
               title: 'Site',
-              subtitle: selectedSiteSlug,
+              subtitle: selectedSiteSlug ?? AppMessages.invalidSelectedSite,
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => _SiteSettingsPage(
+                    builder: (_) => SiteSettingsPage(
                       selectedSiteSlug: selectedSiteSlug,
+                      sites: sites,
+                      isRefreshingSites: isRefreshingSites,
+                      onRefreshSites: onRefreshSites,
+                      onSelectSite: onSelectSite,
                     ),
                   ),
                 );
@@ -340,21 +498,41 @@ class _ServerSettingsPage extends StatelessWidget {
   }
 }
 
-class _SiteSettingsPage extends StatelessWidget {
-  const _SiteSettingsPage({
+class SiteSettingsPage extends StatelessWidget {
+  const SiteSettingsPage({
+    super.key,
     required this.selectedSiteSlug,
+    required this.sites,
+    required this.isRefreshingSites,
+    required this.onRefreshSites,
+    required this.onSelectSite,
   });
 
-  final String selectedSiteSlug;
+  final String? selectedSiteSlug;
+  final List<SiteSummary> sites;
+  final bool isRefreshingSites;
+  final Future<void> Function() onRefreshSites;
+  final ValueChanged<String> onSelectSite;
 
   @override
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
+    final hasValidSelection = selectedSiteSlug != null;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Site'),
+        actions: [
+          AppBusyIconButton(
+            onPressed: () {
+              onRefreshSites();
+            },
+            tooltip: 'Refresh sites',
+            icon: Icons.refresh,
+            isBusy: isRefreshingSites,
+          ),
+        ],
       ),
       body: SafeArea(
         child: AppPage(
@@ -364,6 +542,14 @@ class _SiteSettingsPage extends StatelessWidget {
               subtitle: 'This is the active site for measurement capture and uploads.',
             ),
             SizedBox(height: tokens.sectionGap),
+            if (!hasValidSelection)
+              Padding(
+                padding: EdgeInsets.only(bottom: tokens.spacing.regular),
+                child: const AppBanner(
+                  icon: Icons.warning_amber_rounded,
+                  message: AppMessages.invalidSelectedSite,
+                ),
+              ),
             AppPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -371,12 +557,33 @@ class _SiteSettingsPage extends StatelessWidget {
                   Text('Selected site', style: textTheme.titleMedium),
                   SizedBox(height: tokens.spacing.compact),
                   Text(
-                    selectedSiteSlug,
+                    selectedSiteSlug ?? 'No valid site selected',
                     style: textTheme.headlineSmall,
                   ),
                 ],
               ),
             ),
+            SizedBox(height: tokens.spacing.regular),
+            if (sites.isEmpty)
+              const AppBanner(
+                icon: Icons.info_outline,
+                message: AppMessages.noSitesAvailable,
+              )
+            else
+              AppSettingsGroup(
+                children: [
+                  for (final site in sites)
+                    _ThemeOptionRow(
+                      title: site.name,
+                      subtitle: site.description?.isNotEmpty == true ? site.description! : site.slug,
+                      isSelected: hasValidSelection && selectedSiteSlug == site.slug,
+                      onTap: () {
+                        onSelectSite(site.slug);
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                ],
+              ),
             SizedBox(height: tokens.spacing.regular),
             AppPanel(
               child: Text(
@@ -427,4 +634,37 @@ String _themePreferenceLabel(AppThemePreference preference) {
     AppThemePreference.light => 'Light',
     AppThemePreference.dark => 'Dark',
   };
+}
+
+class _MissingSelectedSiteView extends StatelessWidget {
+  const _MissingSelectedSiteView({
+    required this.onOpenSettings,
+  });
+
+  final VoidCallback onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AppTokens.of(context);
+
+    return AppPage(
+      children: [
+        const AppSectionHeader(
+          title: 'Measurement',
+          subtitle: 'Choose a valid site before recording a measurement.',
+        ),
+        SizedBox(height: tokens.sectionGap),
+        const AppBanner(
+          icon: Icons.warning_amber_rounded,
+          message: AppMessages.invalidSelectedSite,
+        ),
+        SizedBox(height: tokens.spacing.regular),
+        FilledButton.tonalIcon(
+          onPressed: onOpenSettings,
+          icon: const Icon(Icons.settings_outlined),
+          label: const Text('Open settings'),
+        ),
+      ],
+    );
+  }
 }
