@@ -343,7 +343,6 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       internetMeasurementError: _internetMeasurementError,
       measurementSubmissionMessage: _measurementSubmissionMessage,
       lastRecordedAt: _lastRecordedAt,
-      onRefresh: () => _loadMetadata(showLoading: false),
       onRecordMeasurement: _recordMeasurement,
     );
   }
@@ -368,7 +367,6 @@ class MeasurementsView extends StatelessWidget {
     required this.internetMeasurementError,
     required this.measurementSubmissionMessage,
     required this.lastRecordedAt,
-    required this.onRefresh,
     required this.onRecordMeasurement,
   });
 
@@ -387,7 +385,6 @@ class MeasurementsView extends StatelessWidget {
   final String? internetMeasurementError;
   final String? measurementSubmissionMessage;
   final DateTime? lastRecordedAt;
-  final Future<void> Function() onRefresh;
   final Future<void> Function() onRecordMeasurement;
 
   @override
@@ -421,8 +418,6 @@ class MeasurementsView extends StatelessWidget {
           selectedSiteSlug: selectedSiteSlug,
           onOpenSiteSettings: onOpenSiteSettings,
           wifiMetadata: wifiMetadata,
-          isRefreshing: isLoading || isRefreshing,
-          onRefresh: onRefresh,
         ),
         SizedBox(height: tokens.sectionGap),
         if (isLoading)
@@ -732,19 +727,7 @@ class MeasurementsView extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Measurements'),
-        actions: [
-          AppBusyIconButton(
-            onPressed: () {
-              onRefresh();
-            },
-            tooltip: 'Refresh Wi-Fi details',
-            icon: Icons.refresh,
-            isBusy: isLoading || isRefreshing,
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Measurements')),
       body: SafeArea(child: content),
     );
   }
@@ -806,15 +789,11 @@ class _MeasurementHeader extends StatelessWidget {
     required this.selectedSiteSlug,
     required this.onOpenSiteSettings,
     required this.wifiMetadata,
-    required this.isRefreshing,
-    required this.onRefresh,
   });
 
   final String selectedSiteSlug;
   final VoidCallback? onOpenSiteSettings;
   final WifiMetadata wifiMetadata;
-  final bool isRefreshing;
-  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -867,18 +846,6 @@ class _MeasurementHeader extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-            SizedBox(width: tokens.spacing.compact),
-            IconButton.outlined(
-              onPressed: isRefreshing
-                  ? null
-                  : () {
-                      onRefresh();
-                    },
-              icon: isRefreshing
-                  ? const LoadingIndicator.small()
-                  : const Icon(Icons.refresh),
-              tooltip: 'Refresh Wi-Fi details',
             ),
           ],
         ),
