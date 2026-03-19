@@ -7,10 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/material_spacing.dart';
+import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_service.dart';
 import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/internet_measurement_result.dart';
 import 'package:mobile/src/models/wifi_metadata.dart';
+import 'package:mobile/src/services/device_identity_service.dart';
+import 'package:mobile/src/services/server_api.dart';
 
 class MeasurementsPage extends ConsumerStatefulWidget {
   const MeasurementsPage({
@@ -36,6 +39,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
   bool _isRecordingMeasurement = false;
   String? _errorMessage;
   String? _internetMeasurementError;
+  String? _measurementSubmissionMessage;
   InternetSpeedTestProgress _internetProgress = const InternetSpeedTestProgress(
     phase: InternetSpeedTestPhase.idle,
     overallProgress: 0,
@@ -155,6 +159,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     setState(() {
       _isRecordingMeasurement = true;
       _internetMeasurementError = null;
+      _measurementSubmissionMessage = null;
       _internetResult = null;
       _displayedOverallProgress = 0;
       _internetProgress = _internetProgress.mergeWith(const InternetSpeedTestProgress(
@@ -185,12 +190,89 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         return;
       }
 
-      setState(() {
-        _internetResult = result;
-        _lastRecordedAt = DateTime.now();
-        _displayedOverallProgress = 1;
-        _isRecordingMeasurement = false;
-      });
+      final serverUrl = ref.read(serverConnectionControllerProvider).connectedServerUrl;
+      if (serverUrl == null || serverUrl.isEmpty) {
+        setState(() {
+          _internetResult = result;
+          _lastRecordedAt = DateTime.now();
+          _displayedOverallProgress = 1;
+          _isRecordingMeasurement = false;
+          _measurementSubmissionMessage =
+              'Measurement captured locally, but no connected server URL is available for upload.';
+        });
+        return;
+      }
+
+      try {
+        final deviceIdentity = await ref
+            .read(deviceIdentityServiceProvider)
+            .loadIdentity(ref.read(appPreferencesProvider));
+        final measuredAt = DateTime.now();
+        await ref.read(serverApiProvider).submitMeasurement(
+          serverUrl: serverUrl,
+          siteSlug: widget.selectedSiteSlug,
+          device: deviceIdentity,
+          wifiMetadata: _wifiMetadata,
+          internetResult: result,
+          measuredAt: measuredAt,
+          pointLabel: _seededPointId,
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _internetResult = result;
+          _lastRecordedAt = measuredAt;
+          _displayedOverallProgress = 1;
+          _isRecordingMeasurement = false;
+          _measurementSubmissionMessage = 'Measurement uploaded to the WHM server.';
+        });
+        return;
+      } on ApiException catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _internetResult = result;
+          _lastRecordedAt = DateTime.now();
+          _displayedOverallProgress = 1;
+          _isRecordingMeasurement = false;
+          _measurementSubmissionMessage = 'Measurement captured, but upload failed: ${error.message}';
+        });
+        return;
+      } on SocketException catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _internetResult = result;
+          _lastRecordedAt = DateTime.now();
+          _displayedOverallProgress = 1;
+          _isRecordingMeasurement = false;
+          _measurementSubmissionMessage =
+              'Measurement captured, but the server upload could not be completed: ${error.message}.';
+        });
+        return;
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _internetResult = result;
+          _lastRecordedAt = DateTime.now();
+          _displayedOverallProgress = 1;
+          _isRecordingMeasurement = false;
+          _measurementSubmissionMessage =
+              'Measurement captured, but upload failed: $error';
+        });
+        return;
+      }
+
     } on SocketException catch (error) {
       if (!mounted) {
         return;
@@ -251,6 +333,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       isRecordingMeasurement: _isRecordingMeasurement,
       errorMessage: _errorMessage,
       internetMeasurementError: _internetMeasurementError,
+      measurementSubmissionMessage: _measurementSubmissionMessage,
       lastRecordedAt: _lastRecordedAt,
       onRefresh: () => _loadMetadata(showLoading: false),
       onRecordMeasurement: _recordMeasurement,
@@ -273,6 +356,7 @@ class MeasurementsView extends StatelessWidget {
     required this.isRecordingMeasurement,
     required this.errorMessage,
     required this.internetMeasurementError,
+    required this.measurementSubmissionMessage,
     required this.lastRecordedAt,
     required this.onRefresh,
     required this.onRecordMeasurement,
@@ -289,6 +373,7 @@ class MeasurementsView extends StatelessWidget {
   final bool isRecordingMeasurement;
   final String? errorMessage;
   final String? internetMeasurementError;
+  final String? measurementSubmissionMessage;
   final DateTime? lastRecordedAt;
   final Future<void> Function() onRefresh;
   final Future<void> Function() onRecordMeasurement;
@@ -542,6 +627,22 @@ class MeasurementsView extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     internetMeasurementError!,
+                                    style: textTheme.bodyMedium,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (measurementSubmissionMessage != null) ...[
+                            SizedBox(height: spacing.regular),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.cloud_done_outlined),
+                                SizedBox(width: spacing.compact),
+                                Expanded(
+                                  child: Text(
+                                    measurementSubmissionMessage!,
                                     style: textTheme.bodyMedium,
                                   ),
                                 ),

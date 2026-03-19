@@ -51,4 +51,28 @@ class InternetMeasurementResult {
 
     return bps / 1000 / 1000;
   }
+
+  Map<String, Object?> toJson() {
+    return {
+      'backend': backend,
+      'download_bps': downloadBps,
+      'download_elapsed_ms': downloadElapsedMs,
+      'download_jitter_ms': downloadLoadedJitterMs,
+      'download_latency_ms': downloadLoadedLatencyMs,
+      'download_packet_loss_percent': downloadLoadedPacketLossPercent,
+      'download_samples_bps': downloadSamplesBps,
+      'download_size': downloadSize,
+      'idle_jitter_ms': idleJitterMs,
+      'idle_latency_ms': idleLatencyMs,
+      'idle_packet_loss_percent': idlePacketLossPercent,
+      'stream_count': streamCount,
+      'upload_bps': uploadBps,
+      'upload_elapsed_ms': uploadElapsedMs,
+      'upload_jitter_ms': uploadLoadedJitterMs,
+      'upload_latency_ms': uploadLoadedLatencyMs,
+      'upload_packet_loss_percent': uploadLoadedPacketLossPercent,
+      'upload_samples_bps': uploadSamplesBps,
+      'upload_size': uploadSize,
+    }..removeWhere((_, value) => value == null);
+  }
 }

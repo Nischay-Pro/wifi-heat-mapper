@@ -2,8 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mobile/src/models/device_identity.dart';
+import 'package:mobile/src/models/internet_measurement_result.dart';
 import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/models/server_info.dart';
+import 'package:mobile/src/models/wifi_metadata.dart';
 
 const clientName = 'whm-mobile';
 const clientVersion = '0.1.0';
@@ -150,6 +153,58 @@ class ServerApi {
       return sitesJson
           .map((site) => SiteSummary.fromJson(site as Map<String, dynamic>))
           .toList(growable: false);
+    } finally {
+      httpClient.close();
+    }
+  }
+
+  Future<void> submitMeasurement({
+    required String serverUrl,
+    required String siteSlug,
+    required DeviceIdentity device,
+    required WifiMetadata wifiMetadata,
+    required InternetMeasurementResult internetResult,
+    required DateTime measuredAt,
+    required String pointLabel,
+  }) async {
+    final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
+    final measurementsUri = baseUri.replace(
+      path: '${baseUri.path}/api/sites/$siteSlug/measurements'.replaceAll('//', '/'),
+    );
+
+    final payload = jsonEncode({
+      'device': device.toJson(),
+      'point': {
+        'label': pointLabel,
+        'x': 0,
+        'y': 0,
+        'is_base_station': false,
+      },
+      'measured_at': measuredAt.toUtc().toIso8601String(),
+      'wifi': wifiMetadata.toJson(),
+      'local_result': null,
+      'internet_result': internetResult.toJson(),
+    });
+
+    final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
+
+    try {
+      final request =
+          await httpClient.postUrl(measurementsUri).timeout(serverConnectionTimeout);
+      request.headers.contentType = ContentType.json;
+      request.write(payload);
+
+      final response = await request.close().timeout(serverConnectionTimeout);
+      final responseBody = await utf8.decodeStream(response);
+
+      if (response.statusCode != HttpStatus.ok && response.statusCode != HttpStatus.created) {
+        throw _parseApiException(
+          responseBody: responseBody,
+          statusCode: response.statusCode,
+          fallbackMessage:
+              'Server returned ${response.statusCode} for ${measurementsUri.path}',
+        );
+      }
     } finally {
       httpClient.close();
     }

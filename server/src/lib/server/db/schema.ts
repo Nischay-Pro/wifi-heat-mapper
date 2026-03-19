@@ -23,11 +23,23 @@ export interface ThroughputResult {
 	backend?: string;
 	download_bps?: number;
 	download_elapsed_ms?: number;
+	download_jitter_ms?: number;
+	download_latency_ms?: number;
+	download_packet_loss_percent?: number;
+	download_samples_bps?: number[];
 	download_size?: number;
+	idle_jitter_ms?: number;
+	idle_latency_ms?: number;
+	idle_packet_loss_percent?: number;
 	jitter_ms?: number;
 	latency_ms?: number;
+	stream_count?: number;
 	upload_bps?: number;
 	upload_elapsed_ms?: number;
+	upload_jitter_ms?: number;
+	upload_latency_ms?: number;
+	upload_packet_loss_percent?: number;
+	upload_samples_bps?: number[];
 	upload_size?: number;
 }
 

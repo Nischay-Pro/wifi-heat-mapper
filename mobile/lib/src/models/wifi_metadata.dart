@@ -73,6 +73,23 @@ class WifiMetadata {
 
   bool get isAvailable => status == WifiMetadataStatus.available;
 
+  Map<String, Object?> toJson() {
+    return {
+      'bssid': bssid,
+      'channel': channel,
+      'channel_frequency': channelFrequency,
+      'client_ip': clientIp,
+      'frequency_mhz': frequencyMhz,
+      'interface_name': interfaceName,
+      'platform': platform,
+      'rssi': rssi,
+      'signal_quality': signalQuality,
+      'signal_quality_percent': signalQualityPercent,
+      'signal_strength': signalStrength,
+      'ssid': ssid,
+    }..removeWhere((_, value) => value == null);
+  }
+
   static String? _readString(Map<Object?, Object?> json, String key) {
     final value = json[key];
     return value is String && value.isNotEmpty ? value : null;
