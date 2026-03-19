@@ -355,7 +355,7 @@ class _SettingsTab extends ConsumerWidget {
           children: [
             AppSettingsRow(
               icon: Icons.palette_outlined,
-              title: 'UI',
+              title: 'App Theme',
               subtitle: _themePreferenceLabel(themePreference),
               onTap: () {
                 Navigator.of(context).push(
@@ -505,12 +505,12 @@ class _UiSettingsPage extends ConsumerWidget {
     final themeController = ref.read(themeModeControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('UI')),
+      appBar: AppBar(title: const Text('App Theme')),
       body: SafeArea(
         child: AppPage(
           children: [
             const AppSectionHeader(
-              title: 'Options',
+              title: 'User Interface',
               subtitle:
                   'Choose how the app decides between light and dark mode.',
             ),
