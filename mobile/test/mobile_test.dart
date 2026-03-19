@@ -147,7 +147,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Available sites'), findsOneWidget);
+      expect(find.text('Available sites'), findsAtLeastNWidgets(1));
       expect(find.text('Connected to http://localhost:5173'), findsOneWidget);
       expect(find.text('No sites are available on this server.'), findsOneWidget);
     });

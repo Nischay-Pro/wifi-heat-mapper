@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile/src/app/platform_route.dart';
-import 'package:mobile/src/core/loading_indicator.dart';
-import 'package:mobile/src/core/material_spacing.dart';
+import 'package:mobile/src/core/ui/app_tokens.dart';
+import 'package:mobile/src/core/ui/app_widgets.dart';
+import 'package:mobile/src/features/app_shell/site_shell_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
-import 'package:mobile/src/features/measurements/measurements_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
 import 'package:mobile/src/models/site_summary.dart';
@@ -36,7 +36,7 @@ class SitesPage extends ConsumerWidget {
         if (requirementsMet) {
           await Navigator.of(context).push(
             platformPageRoute<void>(
-              MeasurementsPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
+              SiteShellPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
             ),
           );
           return;
@@ -69,8 +69,7 @@ class SitesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spacing = MaterialSpacing.of(context);
-    final textTheme = Theme.of(context).textTheme;
+    final tokens = AppTokens.of(context);
     final selectedSiteSlug = connectionState.sites.any(
       (site) => site.slug == connectionState.selectedSiteSlug,
     )
@@ -81,84 +80,60 @@ class SitesView extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Available sites'),
         actions: [
-          IconButton(
-            onPressed: connectionState.isConnecting ? null : onRefreshSites,
+          AppBusyIconButton(
+            onPressed: () {
+              onRefreshSites();
+            },
             tooltip: 'Refresh sites',
-            icon: connectionState.isConnecting
-                ? const LoadingIndicator.small()
-                : const Icon(Icons.refresh),
+            icon: Icons.refresh,
+            isBusy: connectionState.isConnecting,
           ),
         ],
       ),
       body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: spacing.contentMaxWidth),
-            child: ListView(
-              padding: EdgeInsets.all(spacing.regular),
-              children: [
-                if (connectionState.connectedServerUrl != null)
-                  Padding(
-                    padding: EdgeInsets.only(bottom: spacing.regular),
-                    child: Text(
-                      'Connected to ${connectionState.connectedServerUrl}',
-                      style: textTheme.bodySmall,
-                    ),
-                  ),
-                if (connectionState.sites.isEmpty)
-                  Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(spacing.regular),
-                      child: const Text('No sites are available on this server.'),
-                    ),
-                  )
-                else
-                  ...connectionState.sites.map(
-                    (site) => Padding(
-                      padding: EdgeInsets.only(bottom: spacing.compact),
-                      child: _SiteTile(
-                        site: site,
-                        isSelected: selectedSiteSlug == site.slug,
-                        onSelect: () => onSelectSite(site.slug),
-                      ),
-                    ),
-                  ),
-                SizedBox(height: spacing.regular),
-                OutlinedButton(
-                  onPressed: onChangeServer,
-                  child: const Text('Change server'),
-                ),
-                if (selectedSiteSlug != null) ...[
-                  SizedBox(height: spacing.regular),
-                  FilledButton(
-                    onPressed: onContinue,
-                    child: const Text('Continue'),
-                  ),
-                ],
-                if (selectedSiteSlug != null) ...[
-                  SizedBox(height: spacing.regular),
-                  Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(spacing.regular),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline),
-                          SizedBox(width: spacing.compact),
-                          Expanded(
-                            child: Text(
-                              'Selected site: $selectedSiteSlug',
-                              style: textTheme.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+        child: AppPage(
+          children: [
+            AppSectionHeader(
+              title: 'Available sites',
+              subtitle: connectionState.connectedServerUrl == null
+                  ? 'Pick the site you want to measure.'
+                  : 'Connected to ${connectionState.connectedServerUrl}',
             ),
-          ),
+            SizedBox(height: tokens.sectionGap),
+            if (connectionState.sites.isEmpty)
+              const AppBanner(
+                icon: Icons.info_outline,
+                message: 'No sites are available on this server.',
+              )
+            else
+              ...connectionState.sites.map(
+                (site) => Padding(
+                  padding: EdgeInsets.only(bottom: tokens.spacing.compact),
+                  child: _SiteTile(
+                    site: site,
+                    isSelected: selectedSiteSlug == site.slug,
+                    onSelect: () => onSelectSite(site.slug),
+                  ),
+                ),
+              ),
+            SizedBox(height: tokens.sectionGap),
+            OutlinedButton(
+              onPressed: onChangeServer,
+              child: const Text('Change server'),
+            ),
+            if (selectedSiteSlug != null) ...[
+              SizedBox(height: tokens.spacing.regular),
+              FilledButton(
+                onPressed: onContinue,
+                child: const Text('Continue'),
+              ),
+              SizedBox(height: tokens.spacing.regular),
+              const AppBanner(
+                icon: Icons.check_circle_outline,
+                message: 'A site is selected and ready for measurement.',
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -178,11 +153,12 @@ class _SiteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spacing = MaterialSpacing.of(context);
+    final tokens = AppTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
+    return AppPanel(
+      padding: EdgeInsets.all(tokens.spacing.compact),
       child: ListTile(
         onTap: onSelect,
         title: Text(site.name),
@@ -192,7 +168,7 @@ class _SiteTile extends StatelessWidget {
           children: [
             Text(site.slug, style: textTheme.bodySmall),
             if (site.description != null && site.description!.isNotEmpty) ...[
-              SizedBox(height: spacing.compact / 2),
+              SizedBox(height: tokens.spacing.compact / 2),
               Text(site.description!),
             ],
           ],

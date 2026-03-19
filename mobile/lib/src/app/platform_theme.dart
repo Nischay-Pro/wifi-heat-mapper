@@ -16,8 +16,67 @@ ThemeData buildPlatformTheme() {
 }
 
 ThemeData _buildMaterialTheme() {
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: const Color(0xFF4C8DFF),
+    brightness: Brightness.dark,
+  );
+
   return ThemeData(
     useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: const Color(0xFF111317),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFF111317),
+      foregroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+    ),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: const Color(0xFF1A1D22),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: const BorderSide(color: Color(0xFF2A2E35)),
+      ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: const Color(0xFF171A1F),
+      indicatorColor: colorScheme.primary.withValues(alpha: 0.18),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        final selected = states.contains(WidgetState.selected);
+        return TextStyle(
+          color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        );
+      }),
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        final selected = states.contains(WidgetState.selected);
+        return IconThemeData(
+          color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+        );
+      }),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(kMinInteractiveDimension),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(kMinInteractiveDimension),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+    ),
+    listTileTheme: const ListTileThemeData(
+      contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+    ),
   );
 }
 
