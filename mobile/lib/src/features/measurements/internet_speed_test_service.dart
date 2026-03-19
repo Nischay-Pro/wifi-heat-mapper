@@ -126,6 +126,9 @@ class InternetSpeedTestService {
   final String? unavailableMessage;
 
   static const int _uploadChunkSizeBytes = 256 * 1000;
+  static const int _measurementLabUploadChunkSizeBytes = 256 * 1000;
+  static const Duration _measurementLabUploadYield = Duration(milliseconds: 4);
+  static const String _ndt7SubProtocol = 'net.measurementlab.ndt.v7';
   static const int _loadedLatencyProbeIntervalMs = 400;
   static const int _idleLatencySampleCount = 10;
   static const int _streamCount = 4;
@@ -157,7 +160,7 @@ class InternetSpeedTestService {
 
     final backend = _backendConfig!;
     if (backend.kind == _BackendKind.measurementLab) {
-      throw UnsupportedError(AppMessages.measurementLabNotImplemented);
+      return _recordMeasurementLab(onProgress: onProgress);
     }
 
     final client = HttpClient();
@@ -269,6 +272,382 @@ class InternetSpeedTestService {
       return result;
     } finally {
       client.close(force: true);
+    }
+  }
+
+  Future<InternetMeasurementResult> _recordMeasurementLab({
+    required InternetSpeedTestProgressCallback onProgress,
+  }) async {
+    const downloadDuration = Duration(seconds: 15);
+    const uploadDuration = Duration(seconds: 10);
+    const streamCount = 1;
+
+    onProgress(
+      const InternetSpeedTestProgress(
+        phase: InternetSpeedTestPhase.measuringLatency,
+        overallProgress: 0.02,
+        progress: 0,
+      ),
+    );
+
+    final session = await _discoverMeasurementLabSession(
+      downloadDuration: downloadDuration,
+      uploadDuration: uploadDuration,
+    );
+
+    final download = await _runMeasurementLabPhase(
+      phase: InternetSpeedTestPhase.testingDownload,
+      session: session,
+      plannedDuration: downloadDuration,
+      overallBase: 0.02,
+      overallWeight: 0.48,
+      existingDownloadSamples: const [],
+      onProgress: onProgress,
+    );
+
+    onProgress(
+      InternetSpeedTestProgress(
+        phase: InternetSpeedTestPhase.testingUpload,
+        overallProgress: download.overallProgress,
+        progress: 0,
+        activeStageLabel: 'Measurement Lab upload',
+        downloadBps: download.transferP90Bps,
+        phaseLatencyMs: download.loadedLatency.latencyMs,
+        phaseJitterMs: download.loadedLatency.jitterMs,
+        streamCount: streamCount,
+      ),
+    );
+
+    final upload = await _runMeasurementLabPhase(
+      phase: InternetSpeedTestPhase.testingUpload,
+      session: session,
+      plannedDuration: uploadDuration,
+      overallBase: 0.5,
+      overallWeight: 0.5,
+      existingDownloadSamples: download.samplesBps,
+      onProgress: onProgress,
+    );
+
+    final result = InternetMeasurementResult(
+      backend: 'measurement_lab',
+      streamCount: streamCount,
+      downloadBps: download.transferP90Bps,
+      downloadElapsedMs: download.elapsedMs,
+      downloadLoadedLatencyMs: download.loadedLatency.latencyMs,
+      downloadLoadedJitterMs: download.loadedLatency.jitterMs,
+      downloadSize: download.bytesTransferred.toDouble(),
+      downloadSamplesBps: download.samplesBps,
+      uploadBps: upload.transferP90Bps,
+      uploadElapsedMs: upload.elapsedMs,
+      uploadLoadedLatencyMs: upload.loadedLatency.latencyMs,
+      uploadLoadedJitterMs: upload.loadedLatency.jitterMs,
+      uploadSize: upload.bytesTransferred.toDouble(),
+      uploadSamplesBps: upload.samplesBps,
+    );
+
+    onProgress(
+      InternetSpeedTestProgress(
+        phase: InternetSpeedTestPhase.completed,
+        overallProgress: 1,
+        progress: 1,
+        activeStageLabel: 'Completed',
+        downloadBps: result.downloadBps,
+        phaseLatencyMs: result.uploadLoadedLatencyMs,
+        phaseJitterMs: result.uploadLoadedJitterMs,
+        streamCount: result.streamCount,
+        uploadBps: result.uploadBps,
+      ),
+    );
+
+    return result;
+  }
+
+  Future<_MeasurementLabSession> _discoverMeasurementLabSession({
+    required Duration downloadDuration,
+    required Duration uploadDuration,
+  }) async {
+    final httpClient = HttpClient();
+    httpClient.connectionTimeout = const Duration(seconds: 10);
+    const discoveryUri =
+        'https://locate.measurementlab.net/v2/nearest/ndt/ndt7?format=json';
+
+    try {
+      final request = await httpClient.getUrl(Uri.parse(discoveryUri));
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.userAgentHeader, 'whm-mobile/0.1.0');
+      final response = await request.close();
+      final body = await utf8.decodeStream(response);
+
+      if (response.statusCode == 204) {
+        throw HttpException(AppMessages.measurementLabUnavailable);
+      }
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          'Measurement Lab discovery failed with status ${response.statusCode}.',
+          uri: Uri.parse(discoveryUri),
+        );
+      }
+
+      final decoded = jsonDecode(body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Measurement Lab discovery response is malformed.',
+        );
+      }
+
+      final results = decoded['results'];
+      if (results is! List || results.isEmpty) {
+        throw HttpException(AppMessages.measurementLabUnavailable);
+      }
+
+      final first = results.first;
+      if (first is! Map<String, dynamic>) {
+        throw const FormatException(
+          'Measurement Lab server record is malformed.',
+        );
+      }
+
+      final urls = first['urls'];
+      final host = first['hostname'];
+      if (urls is! Map || host is! String) {
+        throw const FormatException('Measurement Lab server URLs are missing.');
+      }
+
+      final downloadUrl = urls['wss:///ndt/v7/download']?.toString();
+      final uploadUrl = urls['wss:///ndt/v7/upload']?.toString();
+      if (downloadUrl == null || uploadUrl == null) {
+        throw const FormatException(
+          'Measurement Lab did not return NDT7 URLs.',
+        );
+      }
+
+      return _MeasurementLabSession(
+        host: host,
+        downloadUrl: Uri.parse(downloadUrl),
+        uploadUrl: Uri.parse(uploadUrl),
+        downloadDuration: downloadDuration,
+        uploadDuration: uploadDuration,
+      );
+    } finally {
+      httpClient.close(force: true);
+    }
+  }
+
+  Future<_TransferStats> _runMeasurementLabPhase({
+    required InternetSpeedTestPhase phase,
+    required _MeasurementLabSession session,
+    required Duration plannedDuration,
+    required double overallBase,
+    required double overallWeight,
+    required List<double> existingDownloadSamples,
+    required InternetSpeedTestProgressCallback onProgress,
+  }) async {
+    final rttSamplesMs = <double>[];
+    var bytesTransferred = 0;
+    final sampler = _PerSecondSampler();
+    final stopwatch = Stopwatch()..start();
+    final socketUrl = phase == InternetSpeedTestPhase.testingDownload
+        ? session.downloadUrl
+        : session.uploadUrl;
+    final socket = await WebSocket.connect(
+      socketUrl.toString(),
+      protocols: const [_ndt7SubProtocol],
+    );
+    final phaseDone = Completer<void>();
+    Timer? cutoffTimer;
+    Timer? progressTimer;
+    Future<void>? uploadLoop;
+    late final StreamSubscription<Object?> subscription;
+
+    try {
+      subscription = socket.listen(
+        (event) {
+          if (event is String) {
+            final rttMs = _extractMeasurementLabRttMs(event);
+            if (rttMs != null) {
+              rttSamplesMs.add(rttMs);
+            }
+
+            if (phase == InternetSpeedTestPhase.testingUpload) {
+              final acknowledgedBytes = _extractMeasurementLabAckedBytes(event);
+              if (acknowledgedBytes != null && acknowledgedBytes > bytesTransferred) {
+                bytesTransferred = acknowledgedBytes;
+              }
+            }
+            return;
+          }
+
+          if (phase != InternetSpeedTestPhase.testingDownload) {
+            return;
+          }
+
+          if (event is List<int>) {
+            bytesTransferred += event.length;
+            return;
+          }
+
+          if (event is Uint8List) {
+            bytesTransferred += event.length;
+            return;
+          }
+
+          if (event is ByteBuffer) {
+            bytesTransferred += event.lengthInBytes;
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!phaseDone.isCompleted) {
+            phaseDone.completeError(error, stackTrace);
+          }
+        },
+        onDone: () {
+          if (!phaseDone.isCompleted) {
+            phaseDone.complete();
+          }
+        },
+        cancelOnError: true,
+      );
+
+      progressTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+        sampler.capture(
+          totalBytes: bytesTransferred,
+          elapsed: stopwatch.elapsed,
+        );
+        final aggregateP90Bps = _percentile90(sampler.previewSamples);
+        final loadedLatency = _LatencyStats.fromSamples(rttSamplesMs);
+        final phaseProgress =
+            (stopwatch.elapsedMilliseconds / plannedDuration.inMilliseconds)
+                .clamp(0.0, 1.0);
+
+        onProgress(
+          InternetSpeedTestProgress(
+            phase: phase,
+            overallProgress: (overallBase + (phaseProgress * overallWeight))
+                .clamp(0.0, 1.0),
+            progress: phaseProgress,
+            activeStageLabel: phase == InternetSpeedTestPhase.testingDownload
+                ? 'Measurement Lab download'
+                : 'Measurement Lab upload',
+            downloadBps: phase == InternetSpeedTestPhase.testingDownload
+                ? aggregateP90Bps
+                : _percentile90(existingDownloadSamples),
+            phaseLatencyMs: loadedLatency.latencyMs,
+            phaseJitterMs: loadedLatency.jitterMs,
+            streamCount: 1,
+            uploadBps: phase == InternetSpeedTestPhase.testingUpload
+                ? aggregateP90Bps
+                : null,
+          ),
+        );
+      });
+
+      cutoffTimer = Timer(plannedDuration, () async {
+        await socket.close();
+      });
+
+      if (phase == InternetSpeedTestPhase.testingUpload) {
+        uploadLoop = _runMeasurementLabUploadLoop(
+          socket: socket,
+          stopwatch: stopwatch,
+          plannedDuration: plannedDuration,
+          onBytesSent: (chunkBytes) {
+            bytesTransferred += chunkBytes;
+          },
+        );
+      }
+
+      await Future.wait<void>([
+        phaseDone.future,
+        ?uploadLoop,
+      ]);
+
+      final phaseSamples = sampler.finish(
+        totalBytes: bytesTransferred,
+        elapsed: stopwatch.elapsed,
+      );
+      final transferP90Bps = _percentile90(phaseSamples);
+      final loadedLatency = _LatencyStats.fromSamples(rttSamplesMs);
+
+      return _TransferStats(
+        bytesTransferred: bytesTransferred,
+        elapsedMs: stopwatch.elapsedMilliseconds.toDouble(),
+        transferP90Bps: transferP90Bps,
+        overallProgress: (overallBase + overallWeight).clamp(0.0, 1.0),
+        loadedLatency: loadedLatency,
+        samplesBps: List<double>.unmodifiable(phaseSamples),
+      );
+    } finally {
+      progressTimer?.cancel();
+      cutoffTimer?.cancel();
+      await socket.close();
+      await subscription.cancel();
+    }
+  }
+
+  Future<void> _runMeasurementLabUploadLoop({
+    required WebSocket socket,
+    required Stopwatch stopwatch,
+    required Duration plannedDuration,
+    required void Function(int chunkBytes) onBytesSent,
+  }) async {
+    final chunk = Uint8List(_measurementLabUploadChunkSizeBytes);
+
+    while (stopwatch.elapsed < plannedDuration) {
+      socket.add(chunk);
+      onBytesSent(chunk.length);
+      await Future<void>.delayed(_measurementLabUploadYield);
+    }
+  }
+
+  double? _extractMeasurementLabRttMs(String payload) {
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final tcpInfo = decoded['TCPInfo'];
+      if (tcpInfo is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final rttMicros = tcpInfo['RTT'];
+      if (rttMicros is! num || rttMicros <= 0) {
+        return null;
+      }
+
+      return rttMicros / 1000.0;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  int? _extractMeasurementLabAckedBytes(String payload) {
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final tcpInfo = decoded['TCPInfo'];
+      if (tcpInfo is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final bytesAcked = tcpInfo['BytesAcked'];
+      if (bytesAcked is num && bytesAcked >= 0) {
+        return bytesAcked.toInt();
+      }
+
+      final bytesSent = tcpInfo['BytesSent'];
+      if (bytesSent is num && bytesSent >= 0) {
+        return bytesSent.toInt();
+      }
+
+      return null;
+    } on FormatException {
+      return null;
     }
   }
 
@@ -665,7 +1044,7 @@ class InternetSpeedTestService {
 
         return _resolvedCustomLibrespeedBackend(backend);
       case _BackendKind.measurementLab:
-        throw UnsupportedError(AppMessages.measurementLabNotImplemented);
+        throw UnsupportedError(AppMessages.measurementLabUnavailable);
     }
   }
 
@@ -721,7 +1100,7 @@ class InternetSpeedTestService {
           .whereType<_ResolvedBackendCandidate>()
           .toList(growable: false);
       if (reachable.isEmpty) {
-        throw const HttpException(
+        throw HttpException(
           'Could not reach any public Librespeed backend server.',
         );
       }
@@ -741,8 +1120,9 @@ class InternetSpeedTestService {
     Map<String, Object?> server,
   ) async {
     final serverValue = server['server']?.toString();
-    final serverBase =
-        serverValue == null ? null : _normalizedEndpointBaseUri(serverValue);
+    final serverBase = serverValue == null
+        ? null
+        : _normalizedEndpointBaseUri(serverValue);
     final pingPath = server['pingURL']?.toString();
     final downloadPath = server['dlURL']?.toString();
     final uploadPath = server['ulURL']?.toString();
@@ -889,6 +1269,22 @@ class _ResolvedBackendCandidate {
 
   final _ResolvedBackend backend;
   final double latencyMs;
+}
+
+class _MeasurementLabSession {
+  const _MeasurementLabSession({
+    required this.host,
+    required this.downloadUrl,
+    required this.uploadUrl,
+    required this.downloadDuration,
+    required this.uploadDuration,
+  });
+
+  final String host;
+  final Uri downloadUrl;
+  final Uri uploadUrl;
+  final Duration downloadDuration;
+  final Duration uploadDuration;
 }
 
 String _nonce() => DateTime.now().microsecondsSinceEpoch.toString();

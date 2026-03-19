@@ -25,6 +25,6 @@ class AppMessages {
       'Measurement captured locally, but no connected server URL is available for upload.';
   static const customLibrespeedUrlRequired =
       'Enter a valid http:// or https:// URL for your custom Librespeed server.';
-  static const measurementLabNotImplemented =
-      'Measurement Lab is available as a selectable backend, but this client does not support running it yet.';
+  static const measurementLabUnavailable =
+      'Measurement Lab could not provide a test server right now. Try again later.';
 }
