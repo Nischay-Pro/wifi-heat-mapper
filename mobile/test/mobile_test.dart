@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/mobile.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
 import 'package:mobile/src/features/sites/sites_page.dart';
+import 'package:mobile/src/models/site_detail.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
 
 void main() {
@@ -10,11 +11,17 @@ void main() {
 
   group('normalizeServerUrl', () {
     test('keeps a valid base URL', () {
-      expect(serverApi.normalizeServerUrl('http://localhost:5173'), 'http://localhost:5173');
+      expect(
+        serverApi.normalizeServerUrl('http://localhost:5173'),
+        'http://localhost:5173',
+      );
     });
 
     test('removes a trailing slash', () {
-      expect(serverApi.normalizeServerUrl('http://localhost:5173/'), 'http://localhost:5173');
+      expect(
+        serverApi.normalizeServerUrl('http://localhost:5173/'),
+        'http://localhost:5173',
+      );
     });
   });
 
@@ -92,6 +99,42 @@ void main() {
     });
   });
 
+  group('SiteDetail', () {
+    test('parses floor maps and points', () {
+      final site = SiteDetail.fromJson(const {
+        'id': 'site-1',
+        'slug': 'default',
+        'name': 'Default',
+        'description': 'Default site',
+        'floor_maps': [
+          {
+            'id': 'map-1',
+            'name': 'Main Floor',
+            'image_path': '/floorplans/default.svg',
+            'image_width': 640,
+            'image_height': 463,
+          },
+        ],
+        'points': [
+          {
+            'id': 'point-1',
+            'label': 'Entry',
+            'x': 100,
+            'y': 200,
+            'is_base_station': false,
+          },
+        ],
+      });
+
+      expect(site.floorMaps, hasLength(1));
+      expect(site.floorMaps.first.imagePath, '/floorplans/default.svg');
+      expect(site.points, hasLength(1));
+      expect(site.points.first.label, 'Entry');
+      expect(site.points.first.x, 100);
+      expect(site.points.first.y, 200);
+    });
+  });
+
   group('WifiMetadata', () {
     test('parses wifi metadata json', () {
       final wifiMetadata = WifiMetadata.fromJson(const {
@@ -135,19 +178,15 @@ void main() {
     });
 
     test('parses stored values', () {
-      expect(
-        AppThemePreference.fromStorage('light'),
-        AppThemePreference.light,
-      );
-      expect(
-        AppThemePreference.fromStorage('dark'),
-        AppThemePreference.dark,
-      );
+      expect(AppThemePreference.fromStorage('light'), AppThemePreference.light);
+      expect(AppThemePreference.fromStorage('dark'), AppThemePreference.dark);
     });
   });
 
   group('SitesView', () {
-    testWidgets('shows an empty state when no sites are available', (tester) async {
+    testWidgets('shows an empty state when no sites are available', (
+      tester,
+    ) async {
       final state = ServerConnectionState(
         status: ConnectionStatus.connected,
         draftServerUrl: 'http://localhost:5173',
@@ -170,33 +209,42 @@ void main() {
 
       expect(find.text('Available sites'), findsAtLeastNWidgets(1));
       expect(find.text('Connected to http://localhost:5173'), findsOneWidget);
-      expect(find.text('No sites are available on this server.'), findsOneWidget);
+      expect(
+        find.text('No sites are available on this server.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('does not show a stale selected site when the site list is empty', (tester) async {
-      final state = ServerConnectionState(
-        status: ConnectionStatus.connected,
-        draftServerUrl: 'http://localhost:5173',
-        connectedServerUrl: 'http://localhost:5173',
-        sites: const [],
-        selectedSiteSlug: 'default',
-      );
+    testWidgets(
+      'does not show a stale selected site when the site list is empty',
+      (tester) async {
+        final state = ServerConnectionState(
+          status: ConnectionStatus.connected,
+          draftServerUrl: 'http://localhost:5173',
+          connectedServerUrl: 'http://localhost:5173',
+          sites: const [],
+          selectedSiteSlug: 'default',
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: ThemeData(useMaterial3: true),
-          home: SitesView(
-            connectionState: state,
-            onSelectSite: (_) {},
-            onRefreshSites: () async {},
-            onContinue: () async {},
-            onChangeServer: () {},
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(useMaterial3: true),
+            home: SitesView(
+              connectionState: state,
+              onSelectSite: (_) {},
+              onRefreshSites: () async {},
+              onContinue: () async {},
+              onChangeServer: () {},
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('No sites are available on this server.'), findsOneWidget);
-      expect(find.text('Selected site: default'), findsNothing);
-    });
+        expect(
+          find.text('No sites are available on this server.'),
+          findsOneWidget,
+        );
+        expect(find.text('Selected site: default'), findsNothing);
+      },
+    );
   });
 }

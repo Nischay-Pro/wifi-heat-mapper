@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:mobile/src/models/device_identity.dart';
+import 'package:mobile/src/models/site_detail.dart';
+import 'package:mobile/src/models/site_point.dart';
 import 'package:mobile/src/models/internet_measurement_result.dart';
 import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/models/server_info.dart';
@@ -14,10 +16,7 @@ const clientApiVersion = 1;
 const serverConnectionTimeout = Duration(seconds: 3);
 
 class CompatibilityResult {
-  const CompatibilityResult({
-    required this.isCompatible,
-    this.message,
-  });
+  const CompatibilityResult({required this.isCompatible, this.message});
 
   final bool isCompatible;
   final String? message;
@@ -52,8 +51,8 @@ class ServerApi {
     final normalizedPath = parsed.path == '/'
         ? ''
         : parsed.path.endsWith('/') && parsed.path.length > 1
-            ? parsed.path.substring(0, parsed.path.length - 1)
-            : parsed.path;
+        ? parsed.path.substring(0, parsed.path.length - 1)
+        : parsed.path;
 
     return parsed.replace(path: normalizedPath).toString();
   }
@@ -88,10 +87,13 @@ class ServerApi {
       path: '${baseUri.path}/api/server-info'.replaceAll('//', '/'),
     );
 
-    final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
+    final httpClient = HttpClient()
+      ..connectionTimeout = serverConnectionTimeout;
 
     try {
-      final request = await httpClient.getUrl(infoUri).timeout(serverConnectionTimeout);
+      final request = await httpClient
+          .getUrl(infoUri)
+          .timeout(serverConnectionTimeout);
       final response = await request.close().timeout(serverConnectionTimeout);
       final responseBody = await utf8.decodeStream(response);
 
@@ -107,16 +109,16 @@ class ServerApi {
       final readinessJson = decoded['readiness'];
 
       if (serverJson is! Map<String, dynamic>) {
-        throw const FormatException('Server info payload is missing the server object.');
+        throw const FormatException(
+          'Server info payload is missing the server object.',
+        );
       }
 
-      final databaseReady =
-          readinessJson is Map<String, dynamic> ? readinessJson['database'] == true : true;
+      final databaseReady = readinessJson is Map<String, dynamic>
+          ? readinessJson['database'] == true
+          : true;
 
-      return ServerInfo.fromJson(
-        serverJson,
-        databaseReady: databaseReady,
-      );
+      return ServerInfo.fromJson(serverJson, databaseReady: databaseReady);
     } finally {
       httpClient.close();
     }
@@ -128,10 +130,13 @@ class ServerApi {
       path: '${baseUri.path}/api/sites'.replaceAll('//', '/'),
     );
 
-    final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
+    final httpClient = HttpClient()
+      ..connectionTimeout = serverConnectionTimeout;
 
     try {
-      final request = await httpClient.getUrl(sitesUri).timeout(serverConnectionTimeout);
+      final request = await httpClient
+          .getUrl(sitesUri)
+          .timeout(serverConnectionTimeout);
       final response = await request.close().timeout(serverConnectionTimeout);
       final responseBody = await utf8.decodeStream(response);
 
@@ -139,7 +144,8 @@ class ServerApi {
         throw _parseApiException(
           responseBody: responseBody,
           statusCode: response.statusCode,
-          fallbackMessage: 'Server returned ${response.statusCode} for ${sitesUri.path}',
+          fallbackMessage:
+              'Server returned ${response.statusCode} for ${sitesUri.path}',
         );
       }
 
@@ -158,6 +164,47 @@ class ServerApi {
     }
   }
 
+  Future<SiteDetail> fetchSiteDetail({
+    required String serverUrl,
+    required String siteSlug,
+  }) async {
+    final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
+    final siteUri = baseUri.replace(
+      path: '${baseUri.path}/api/sites/$siteSlug'.replaceAll('//', '/'),
+    );
+
+    final httpClient = HttpClient()
+      ..connectionTimeout = serverConnectionTimeout;
+
+    try {
+      final request = await httpClient
+          .getUrl(siteUri)
+          .timeout(serverConnectionTimeout);
+      final response = await request.close().timeout(serverConnectionTimeout);
+      final responseBody = await utf8.decodeStream(response);
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw _parseApiException(
+          responseBody: responseBody,
+          statusCode: response.statusCode,
+          fallbackMessage:
+              'Server returned ${response.statusCode} for ${siteUri.path}',
+        );
+      }
+
+      final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+      final siteJson = decoded['site'];
+
+      if (siteJson is! Map<String, dynamic>) {
+        throw const FormatException('Site payload is missing the site object.');
+      }
+
+      return SiteDetail.fromJson(siteJson);
+    } finally {
+      httpClient.close();
+    }
+  }
+
   Future<void> submitMeasurement({
     required String serverUrl,
     required String siteSlug,
@@ -165,20 +212,24 @@ class ServerApi {
     required WifiMetadata wifiMetadata,
     required InternetMeasurementResult internetResult,
     required DateTime measuredAt,
-    required String pointLabel,
+    required SitePoint point,
   }) async {
     final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
     final measurementsUri = baseUri.replace(
-      path: '${baseUri.path}/api/sites/$siteSlug/measurements'.replaceAll('//', '/'),
+      path: '${baseUri.path}/api/sites/$siteSlug/measurements'.replaceAll(
+        '//',
+        '/',
+      ),
     );
 
     final payload = jsonEncode({
       'device': device.toJson(),
       'point': {
-        'label': pointLabel,
-        'x': 0,
-        'y': 0,
-        'is_base_station': false,
+        'id': point.id,
+        'label': point.label ?? 'Unnamed point',
+        'x': point.x,
+        'y': point.y,
+        'is_base_station': point.isBaseStation,
       },
       'measured_at': measuredAt.toUtc().toIso8601String(),
       'wifi': wifiMetadata.toJson(),
@@ -186,18 +237,21 @@ class ServerApi {
       'internet_result': internetResult.toJson(),
     });
 
-    final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
+    final httpClient = HttpClient()
+      ..connectionTimeout = serverConnectionTimeout;
 
     try {
-      final request =
-          await httpClient.postUrl(measurementsUri).timeout(serverConnectionTimeout);
+      final request = await httpClient
+          .postUrl(measurementsUri)
+          .timeout(serverConnectionTimeout);
       request.headers.contentType = ContentType.json;
       request.write(payload);
 
       final response = await request.close().timeout(serverConnectionTimeout);
       final responseBody = await utf8.decodeStream(response);
 
-      if (response.statusCode != HttpStatus.ok && response.statusCode != HttpStatus.created) {
+      if (response.statusCode != HttpStatus.ok &&
+          response.statusCode != HttpStatus.created) {
         throw _parseApiException(
           responseBody: responseBody,
           statusCode: response.statusCode,
@@ -223,14 +277,13 @@ class ServerApi {
         return ApiException(
           message: errorJson['message'] as String? ?? fallbackMessage,
           statusCode: statusCode,
-          code: (errorJson['details'] as Map<String, dynamic>?)?['code'] as String?,
+          code:
+              (errorJson['details'] as Map<String, dynamic>?)?['code']
+                  as String?,
         );
       }
     } catch (_) {}
 
-    return ApiException(
-      message: fallbackMessage,
-      statusCode: statusCode,
-    );
+    return ApiException(message: fallbackMessage, statusCode: statusCode);
   }
 }

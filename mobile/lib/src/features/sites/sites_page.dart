@@ -7,6 +7,7 @@ import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/app_shell/site_shell_page.dart';
+import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
@@ -20,9 +21,11 @@ class SitesPage extends ConsumerStatefulWidget {
   ConsumerState<SitesPage> createState() => _SitesPageState();
 }
 
-class _SitesPageState extends ConsumerState<SitesPage> with WidgetsBindingObserver {
+class _SitesPageState extends ConsumerState<SitesPage>
+    with WidgetsBindingObserver {
   Timer? _pollTimer;
   bool _isPolling = false;
+  bool _isNavigatingAway = false;
 
   @override
   void initState() {
@@ -68,7 +71,7 @@ class _SitesPageState extends ConsumerState<SitesPage> with WidgetsBindingObserv
   }
 
   Future<void> _pollServerState() async {
-    if (_isPolling) {
+    if (_isPolling || _isNavigatingAway) {
       return;
     }
     if (!(ModalRoute.of(context)?.isCurrent ?? false)) {
@@ -78,19 +81,26 @@ class _SitesPageState extends ConsumerState<SitesPage> with WidgetsBindingObserv
     _isPolling = true;
 
     try {
-      final validation =
-          await ref.read(serverConnectionControllerProvider.notifier).validateActiveConnection();
+      final validation = await ref
+          .read(serverConnectionControllerProvider.notifier)
+          .validateActiveConnection();
       if (!mounted) {
         return;
       }
 
       if (!validation.serverAvailable) {
+        _isNavigatingAway = true;
+        _stopPolling();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppMessages.serverUnavailable),
-          ),
+          const SnackBar(content: Text(AppMessages.serverUnavailable)),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        await Navigator.of(context).pushAndRemoveUntil(
+          platformPageRoute<void>(
+            const ServerConnectPage(),
+            settings: const RouteSettings(name: serverConnectRouteName),
+          ),
+          (_) => false,
+        );
       }
     } finally {
       _isPolling = false;
@@ -112,7 +122,8 @@ class _SitesPageState extends ConsumerState<SitesPage> with WidgetsBindingObserv
           return;
         }
 
-        final requirementsMet = await wifiPermissionService.areRequirementsMet();
+        final requirementsMet = await wifiPermissionService
+            .areRequirementsMet();
         if (!context.mounted) {
           return;
         }
@@ -120,7 +131,9 @@ class _SitesPageState extends ConsumerState<SitesPage> with WidgetsBindingObserv
         if (requirementsMet) {
           await Navigator.of(context).push(
             platformPageRoute<void>(
-              SiteShellPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
+              SiteShellPage(
+                selectedSiteSlug: connectionState.selectedSiteSlug!,
+              ),
               settings: const RouteSettings(name: siteShellRouteName),
             ),
           );
@@ -158,9 +171,10 @@ class SitesView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
-    final selectedSiteSlug = connectionState.sites.any(
-      (site) => site.slug == connectionState.selectedSiteSlug,
-    )
+    final selectedSiteSlug =
+        connectionState.sites.any(
+          (site) => site.slug == connectionState.selectedSiteSlug,
+        )
         ? connectionState.selectedSiteSlug
         : null;
 
@@ -262,7 +276,9 @@ class _SiteTile extends StatelessWidget {
         ),
         leading: Icon(
           isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-          color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.onSurfaceVariant,
         ),
         selected: isSelected,
       ),

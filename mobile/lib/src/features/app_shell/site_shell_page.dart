@@ -7,11 +7,13 @@ import 'package:mobile/src/app/theme_mode_controller.dart';
 import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
+import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
+import 'package:mobile/src/features/sites/sites_page.dart';
 import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
 
@@ -29,6 +31,7 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage>
   int _selectedIndex = 0;
   Timer? _pollTimer;
   bool _isPolling = false;
+  bool _isNavigatingAway = false;
 
   @override
   void initState() {
@@ -74,7 +77,7 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage>
   }
 
   Future<void> _pollServerState() async {
-    if (_isPolling) {
+    if (_isPolling || _isNavigatingAway) {
       return;
     }
 
@@ -89,10 +92,18 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage>
       }
 
       if (!validation.serverAvailable) {
+        _isNavigatingAway = true;
+        _stopPolling();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppMessages.serverUnavailable)),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        await Navigator.of(context).pushAndRemoveUntil(
+          platformPageRoute<void>(
+            const ServerConnectPage(),
+            settings: const RouteSettings(name: serverConnectRouteName),
+          ),
+          (_) => false,
+        );
         return;
       }
 
@@ -104,6 +115,8 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage>
       }
 
       if (!requirementsMet) {
+        _isNavigatingAway = true;
+        _stopPolling();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppMessages.wifiPermissionsMissing)),
         );
@@ -117,11 +130,17 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage>
       }
 
       if (!validation.selectedSiteValid) {
+        _isNavigatingAway = true;
+        _stopPolling();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppMessages.invalidSelectedSite)),
         );
-        Navigator.of(context).popUntil(
-          (route) => route.settings.name == sitesRouteName || route.isFirst,
+        await Navigator.of(context).pushAndRemoveUntil(
+          platformPageRoute<void>(
+            const SitesPage(),
+            settings: const RouteSettings(name: sitesRouteName),
+          ),
+          (_) => false,
         );
       }
     } finally {

@@ -7,6 +7,14 @@ class AppMessages {
   static const invalidSelectedSite =
       'Selected site no longer exists on the server.';
   static const noSitesAvailable = 'No sites are available on this server.';
+  static const noFloorplanAvailable =
+      'This site does not have a floorplan yet. Upload one from the WHM Admin Dashboard.';
+  static const noPointsAvailable =
+      'This site does not have any measurement points yet. Add points from the WHM Admin Dashboard.';
+  static const floorplanLoadFailed =
+      'The site floorplan could not be loaded right now.';
+  static const pointNoLongerExists =
+      'The selected point is no longer available. Choose another point on the floorplan.';
 
   static const wifiDisabled =
       'Wi-Fi is turned off. Turn on Wi-Fi to collect Wi-Fi metadata.';

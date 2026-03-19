@@ -8,15 +8,18 @@ import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/app_shell/site_shell_page.dart';
+import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_models.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
+import 'package:mobile/src/features/sites/sites_page.dart';
 
 class WifiPermissionsPage extends ConsumerStatefulWidget {
   const WifiPermissionsPage({super.key});
 
   @override
-  ConsumerState<WifiPermissionsPage> createState() => _WifiPermissionsPageState();
+  ConsumerState<WifiPermissionsPage> createState() =>
+      _WifiPermissionsPageState();
 }
 
 class _WifiPermissionsPageState extends ConsumerState<WifiPermissionsPage>
@@ -27,6 +30,7 @@ class _WifiPermissionsPageState extends ConsumerState<WifiPermissionsPage>
   Timer? _pollTimer;
   bool _isPolling = false;
   bool _isNavigatingToShell = false;
+  bool _isNavigatingAway = false;
 
   @override
   void initState() {
@@ -74,37 +78,48 @@ class _WifiPermissionsPageState extends ConsumerState<WifiPermissionsPage>
   }
 
   Future<void> _pollServerState() async {
-    if (_isPolling) {
+    if (_isPolling || _isNavigatingToShell || _isNavigatingAway) {
       return;
     }
 
     _isPolling = true;
 
     try {
-      final validation =
-          await ref.read(serverConnectionControllerProvider.notifier).validateActiveConnection();
+      final validation = await ref
+          .read(serverConnectionControllerProvider.notifier)
+          .validateActiveConnection();
       if (!mounted) {
         return;
       }
 
       if (!validation.serverAvailable) {
+        _isNavigatingAway = true;
+        _stopPolling();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppMessages.serverUnavailable),
-          ),
+          const SnackBar(content: Text(AppMessages.serverUnavailable)),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        await Navigator.of(context).pushAndRemoveUntil(
+          platformPageRoute<void>(
+            const ServerConnectPage(),
+            settings: const RouteSettings(name: serverConnectRouteName),
+          ),
+          (_) => false,
+        );
         return;
       }
 
       if (!validation.selectedSiteValid) {
+        _isNavigatingAway = true;
+        _stopPolling();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppMessages.invalidSelectedSite),
-          ),
+          const SnackBar(content: Text(AppMessages.invalidSelectedSite)),
         );
-        Navigator.of(context).popUntil(
-          (route) => route.settings.name == sitesRouteName || route.isFirst,
+        await Navigator.of(context).pushAndRemoveUntil(
+          platformPageRoute<void>(
+            const SitesPage(),
+            settings: const RouteSettings(name: sitesRouteName),
+          ),
+          (_) => false,
         );
       }
     } finally {
@@ -120,7 +135,9 @@ class _WifiPermissionsPageState extends ConsumerState<WifiPermissionsPage>
     final service = ref.read(wifiPermissionServiceProvider);
     final requirements = await service.loadRequirements();
     final connectionState = ref.read(serverConnectionControllerProvider);
-    final allGranted = requirements.every((requirement) => requirement.isGranted);
+    final allGranted = requirements.every(
+      (requirement) => requirement.isGranted,
+    );
 
     if (!mounted) {
       return;
@@ -181,12 +198,15 @@ class WifiPermissionsView extends StatelessWidget {
   final bool isLoading;
   final bool isRefreshing;
   final Future<void> Function() onRefresh;
-  final Future<void> Function(WifiPermissionRequirement requirement) onCompleteAction;
+  final Future<void> Function(WifiPermissionRequirement requirement)
+  onCompleteAction;
 
   @override
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
-    final grantedCount = requirements.where((requirement) => requirement.isGranted).length;
+    final grantedCount = requirements
+        .where((requirement) => requirement.isGranted)
+        .length;
 
     return Scaffold(
       appBar: AppBar(
@@ -219,9 +239,7 @@ class WifiPermissionsView extends StatelessWidget {
             ),
             SizedBox(height: tokens.sectionGap),
             if (isLoading)
-              const Center(
-                child: LoadingIndicator.medium(),
-              )
+              const Center(child: LoadingIndicator.medium())
             else
               ...requirements.map(
                 (requirement) => Padding(
@@ -246,7 +264,8 @@ class _PermissionRequirementCard extends StatelessWidget {
   });
 
   final WifiPermissionRequirement requirement;
-  final Future<void> Function(WifiPermissionRequirement requirement) onCompleteAction;
+  final Future<void> Function(WifiPermissionRequirement requirement)
+  onCompleteAction;
 
   @override
   Widget build(BuildContext context) {
@@ -262,8 +281,12 @@ class _PermissionRequirementCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                requirement.isGranted ? Icons.check_circle : Icons.shield_outlined,
-                color: requirement.isGranted ? colorScheme.primary : colorScheme.error,
+                requirement.isGranted
+                    ? Icons.check_circle
+                    : Icons.shield_outlined,
+                color: requirement.isGranted
+                    ? colorScheme.primary
+                    : colorScheme.error,
               ),
               SizedBox(width: tokens.spacing.compact),
               Expanded(
@@ -278,7 +301,8 @@ class _PermissionRequirementCard extends StatelessWidget {
               ),
             ],
           ),
-          if (requirement.actionKind != null && requirement.actionLabel != null) ...[
+          if (requirement.actionKind != null &&
+              requirement.actionLabel != null) ...[
             SizedBox(height: tokens.spacing.regular),
             Align(
               alignment: Alignment.centerLeft,

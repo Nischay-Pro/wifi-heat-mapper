@@ -75,3 +75,24 @@ CREATE INDEX IF NOT EXISTS idx_measurements_measured_at ON measurements(measured
 INSERT INTO sites (slug, name, description)
 VALUES ('default', 'Default', 'Default site created during initial bootstrap')
 ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO floor_maps (site_id, name, image_path, image_width, image_height)
+SELECT s.id, 'Main Floor', '/floorplans/default.svg', 640, 463
+FROM sites s
+WHERE s.slug = 'default';
+
+INSERT INTO points (site_id, label, x, y, is_base_station)
+SELECT s.id, p.label, p.x, p.y, p.is_base_station
+FROM sites s
+CROSS JOIN (
+  VALUES
+    ('Entry', 318, 382, FALSE),
+    ('Hallway', 233, 244, FALSE),
+    ('Dining', 355, 126, FALSE),
+    ('Living Room', 515, 147, FALSE),
+    ('Breakfast Nook', 131, 132, FALSE),
+    ('Kitchen', 70, 278, FALSE),
+    ('Office', 512, 338, FALSE),
+    ('Access Point', 420, 287, TRUE)
+) AS p(label, x, y, is_base_station)
+WHERE s.slug = 'default';

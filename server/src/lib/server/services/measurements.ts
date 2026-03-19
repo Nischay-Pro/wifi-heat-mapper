@@ -50,6 +50,7 @@ export interface MeasurementDeviceInput {
 }
 
 export interface MeasurementPointInput {
+	id?: string;
 	label: string;
 	x: number;
 	y: number;
@@ -64,6 +65,13 @@ export interface CreateMeasurementInput {
 	wifi: WifiMetadata;
 	localResult: ThroughputResult | null;
 	internetResult: ThroughputResult | null;
+}
+
+export class PointNotFoundError extends Error {
+	constructor(pointId: string) {
+		super(`Point '${pointId}' was not found for the selected site.`);
+		this.name = "PointNotFoundError";
+	}
 }
 
 export async function createMeasurement(input: CreateMeasurementInput) {
@@ -88,25 +96,40 @@ export async function createMeasurement(input: CreateMeasurementInput) {
 			.returning(["id", "slug", "name", "platform", "model"])
 			.executeTakeFirstOrThrow();
 
-		let point = await trx
-			.selectFrom("points")
-			.select(["id", "label", "x", "y", "is_base_station"])
-			.where("site_id", "=", input.siteId)
-			.where("label", "=", input.point.label)
-			.executeTakeFirst();
+		let point;
 
-		if (!point) {
+		if (input.point.id) {
 			point = await trx
-				.insertInto("points")
-				.values({
-					site_id: input.siteId,
-					label: input.point.label,
-					x: input.point.x,
-					y: input.point.y,
-					is_base_station: input.point.is_base_station
-				})
-				.returning(["id", "label", "x", "y", "is_base_station"])
-				.executeTakeFirstOrThrow();
+				.selectFrom("points")
+				.select(["id", "label", "x", "y", "is_base_station"])
+				.where("site_id", "=", input.siteId)
+				.where("id", "=", input.point.id)
+				.executeTakeFirst();
+
+			if (!point) {
+				throw new PointNotFoundError(input.point.id);
+			}
+		} else {
+			point = await trx
+				.selectFrom("points")
+				.select(["id", "label", "x", "y", "is_base_station"])
+				.where("site_id", "=", input.siteId)
+				.where("label", "=", input.point.label)
+				.executeTakeFirst();
+
+			if (!point) {
+				point = await trx
+					.insertInto("points")
+					.values({
+						site_id: input.siteId,
+						label: input.point.label,
+						x: input.point.x,
+						y: input.point.y,
+						is_base_station: input.point.is_base_station
+					})
+					.returning(["id", "label", "x", "y", "is_base_station"])
+					.executeTakeFirstOrThrow();
+			}
 		}
 
 		const measurement = await trx

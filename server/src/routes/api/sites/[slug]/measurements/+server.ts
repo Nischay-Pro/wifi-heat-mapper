@@ -4,7 +4,8 @@ import {
 	createMeasurement,
 	listMeasurements,
 	type MeasurementDeviceInput,
-	type MeasurementPointInput
+	type MeasurementPointInput,
+	PointNotFoundError
 } from "$lib/server/services/measurements";
 import { getSiteBySlug } from "$lib/server/services/sites";
 
@@ -75,6 +76,12 @@ export async function POST({ params, request }) {
 			});
 		}
 
+		if (error instanceof PointNotFoundError) {
+			return failure(404, error.message, {
+				code: "invalid_point"
+			});
+		}
+
 		throw error;
 	}
 }
@@ -132,6 +139,7 @@ function parsePoint(value: unknown): MeasurementPointInput {
 	const point = requireObject(value, "point");
 
 	return {
+		id: parseOptionalString(point.id, "point.id", 128),
 		label: parseRequiredString(point.label, "point.label", 128),
 		x: parseOptionalInteger(point.x, "point.x") ?? 0,
 		y: parseOptionalInteger(point.y, "point.y") ?? 0,
