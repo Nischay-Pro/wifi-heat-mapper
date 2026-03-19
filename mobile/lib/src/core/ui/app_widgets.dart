@@ -89,6 +89,7 @@ class AppPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: padding ?? EdgeInsets.all(tokens.cardPadding),
         child: child,
@@ -219,6 +220,77 @@ class AppBusyIconButton extends StatelessWidget {
       onPressed: isBusy ? null : onPressed,
       tooltip: tooltip,
       icon: isBusy ? const LoadingIndicator.small() : Icon(icon),
+    );
+  }
+}
+
+class AppSettingsGroup extends StatelessWidget {
+  const AppSettingsGroup({
+    super.key,
+    required this.children,
+  });
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AppTokens.of(context);
+
+    return AppPanel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var index = 0; index < children.length; index++) ...[
+            children[index],
+            if (index < children.length - 1)
+              Divider(
+                height: 1,
+                indent: tokens.cardPadding,
+                endIndent: tokens.cardPadding,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class AppSettingsRow extends StatelessWidget {
+  const AppSettingsRow({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = AppTokens.of(context);
+
+    return ListTile(
+      onTap: onTap,
+      leading: Icon(
+        icon,
+        color: colorScheme.primary,
+        size: tokens.iconMedium + 2,
+      ),
+      title: Text(title, style: textTheme.titleMedium),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+      trailing: const Icon(Icons.chevron_right_rounded),
     );
   }
 }

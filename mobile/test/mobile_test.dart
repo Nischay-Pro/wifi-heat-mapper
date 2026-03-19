@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/mobile.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
 import 'package:mobile/src/features/sites/sites_page.dart';
+import 'package:mobile/src/storage/app_preferences.dart';
 
 void main() {
   const serverApi = ServerApi();
@@ -122,6 +123,26 @@ void main() {
       expect(wifiMetadata.signalQuality, 74);
       expect(wifiMetadata.signalQualityPercent, 74.0);
       expect(wifiMetadata.signalStrength, -58);
+    });
+  });
+
+  group('AppThemePreference', () {
+    test('falls back to system for unknown values', () {
+      expect(
+        AppThemePreference.fromStorage('unexpected'),
+        AppThemePreference.system,
+      );
+    });
+
+    test('parses stored values', () {
+      expect(
+        AppThemePreference.fromStorage('light'),
+        AppThemePreference.light,
+      );
+      expect(
+        AppThemePreference.fromStorage('dark'),
+        AppThemePreference.dark,
+      );
     });
   });
 
