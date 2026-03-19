@@ -8,6 +8,7 @@ import 'package:mobile/src/core/app_messages.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
+import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
@@ -15,10 +16,7 @@ import 'package:mobile/src/models/site_summary.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
 
 class SiteShellPage extends ConsumerStatefulWidget {
-  const SiteShellPage({
-    super.key,
-    required this.selectedSiteSlug,
-  });
+  const SiteShellPage({super.key, required this.selectedSiteSlug});
 
   final String selectedSiteSlug;
 
@@ -26,7 +24,8 @@ class SiteShellPage extends ConsumerStatefulWidget {
   ConsumerState<SiteShellPage> createState() => _SiteShellPageState();
 }
 
-class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindingObserver {
+class _SiteShellPageState extends ConsumerState<SiteShellPage>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
   Timer? _pollTimer;
   bool _isPolling = false;
@@ -82,32 +81,31 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindi
     _isPolling = true;
 
     try {
-      final validation =
-          await ref.read(serverConnectionControllerProvider.notifier).validateActiveConnection();
+      final validation = await ref
+          .read(serverConnectionControllerProvider.notifier)
+          .validateActiveConnection();
       if (!mounted) {
         return;
       }
 
       if (!validation.serverAvailable) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppMessages.serverUnavailable),
-          ),
+          const SnackBar(content: Text(AppMessages.serverUnavailable)),
         );
         Navigator.of(context).popUntil((route) => route.isFirst);
         return;
       }
 
-      final requirementsMet = await ref.read(wifiPermissionServiceProvider).areRequirementsMet();
+      final requirementsMet = await ref
+          .read(wifiPermissionServiceProvider)
+          .areRequirementsMet();
       if (!mounted) {
         return;
       }
 
       if (!requirementsMet) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppMessages.wifiPermissionsMissing),
-          ),
+          const SnackBar(content: Text(AppMessages.wifiPermissionsMissing)),
         );
         await Navigator.of(context).pushReplacement(
           platformPageRoute<void>(
@@ -120,9 +118,7 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindi
 
       if (!validation.selectedSiteValid) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppMessages.invalidSelectedSite),
-          ),
+          const SnackBar(content: Text(AppMessages.invalidSelectedSite)),
         );
         Navigator.of(context).popUntil(
           (route) => route.settings.name == sitesRouteName || route.isFirst,
@@ -136,9 +132,10 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     final connectionState = ref.watch(serverConnectionControllerProvider);
-    final currentSelectedSiteSlug = connectionState.sites.any(
-      (site) => site.slug == connectionState.selectedSiteSlug,
-    )
+    final currentSelectedSiteSlug =
+        connectionState.sites.any(
+          (site) => site.slug == connectionState.selectedSiteSlug,
+        )
         ? connectionState.selectedSiteSlug
         : null;
 
@@ -166,9 +163,13 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindi
                         selectedSiteSlug: currentSelectedSiteSlug,
                         sites: connectionState.sites,
                         isRefreshingSites: connectionState.isConnecting,
-                        onRefreshSites: ref.read(serverConnectionControllerProvider.notifier).connect,
+                        onRefreshSites: ref
+                            .read(serverConnectionControllerProvider.notifier)
+                            .connect,
                         onSelectSite: (siteSlug) async {
-                          await ref.read(serverConnectionControllerProvider.notifier).selectSite(siteSlug);
+                          await ref
+                              .read(serverConnectionControllerProvider.notifier)
+                              .selectSite(siteSlug);
                         },
                       ),
                     ),
@@ -180,11 +181,16 @@ class _SiteShellPageState extends ConsumerState<SiteShellPage> with WidgetsBindi
               sites: connectionState.sites,
               connectedServerUrl: connectionState.connectedServerUrl,
               isRefreshingSites: connectionState.isConnecting,
-              onRefreshSites: ref.read(serverConnectionControllerProvider.notifier).connect,
+              onRefreshSites: ref
+                  .read(serverConnectionControllerProvider.notifier)
+                  .connect,
               onSelectSite: (siteSlug) async {
-                await ref.read(serverConnectionControllerProvider.notifier).selectSite(siteSlug);
+                await ref
+                    .read(serverConnectionControllerProvider.notifier)
+                    .selectSite(siteSlug);
               },
-              onChangeServer: () => Navigator.of(context).popUntil((route) => route.isFirst),
+              onChangeServer: () =>
+                  Navigator.of(context).popUntil((route) => route.isFirst),
             ),
           ],
         ),
@@ -215,8 +221,12 @@ class _ShellBottomBar extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorScheme = Theme.of(context).colorScheme;
     final barColor = isDark ? const Color(0xFF171A1F) : const Color(0xFFEDEFF3);
-    final borderColor = isDark ? const Color(0xFF232832) : const Color(0xFFD4DBE6);
-    final indicatorColor = isDark ? const Color(0xFF353A42) : const Color(0xFFD9DEE7);
+    final borderColor = isDark
+        ? const Color(0xFF232832)
+        : const Color(0xFFD4DBE6);
+    final indicatorColor = isDark
+        ? const Color(0xFF353A42)
+        : const Color(0xFFD9DEE7);
     const destinations = <_ShellDestination>[
       _ShellDestination(
         icon: Icons.network_check_outlined,
@@ -234,14 +244,14 @@ class _ShellBottomBar extends StatelessWidget {
         height: 88,
         decoration: BoxDecoration(
           color: barColor,
-          border: Border(
-            top: BorderSide(color: borderColor),
-          ),
+          border: Border(top: BorderSide(color: borderColor)),
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
             const outerPadding = 8.0;
-            final segmentWidth = (constraints.maxWidth - (outerPadding * 2)) / destinations.length;
+            final segmentWidth =
+                (constraints.maxWidth - (outerPadding * 2)) /
+                destinations.length;
 
             return Stack(
               children: [
@@ -269,7 +279,9 @@ class _ShellBottomBar extends StatelessWidget {
                           color: Colors.transparent,
                           child: InkWell(
                             onTap: () => onSelected(index),
-                            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                            overlayColor: const WidgetStatePropertyAll(
+                              Colors.transparent,
+                            ),
                             splashFactory: NoSplash.splashFactory,
                             borderRadius: BorderRadius.circular(24),
                             child: SizedBox.expand(
@@ -299,10 +311,7 @@ class _ShellBottomBar extends StatelessWidget {
 }
 
 class _ShellDestination {
-  const _ShellDestination({
-    required this.icon,
-    required this.selectedIcon,
-  });
+  const _ShellDestination({required this.icon, required this.selectedIcon});
 
   final IconData icon;
   final IconData selectedIcon;
@@ -331,6 +340,9 @@ class _SettingsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tokens = AppTokens.of(context);
     final themePreference = ref.watch(themeModeControllerProvider);
+    final internetSettings = ref.watch(
+      internetSpeedTestSettingsControllerProvider,
+    );
 
     return AppPage(
       children: [
@@ -349,6 +361,18 @@ class _SettingsTab extends ConsumerWidget {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const _UiSettingsPage(),
+                  ),
+                );
+              },
+            ),
+            AppSettingsRow(
+              icon: Icons.public_outlined,
+              title: 'Internet speed test',
+              subtitle: internetSettings.backendLabel,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const _InternetSettingsPage(),
                   ),
                 );
               },
@@ -393,6 +417,84 @@ class _SettingsTab extends ConsumerWidget {
   }
 }
 
+class _InternetSettingsPage extends ConsumerWidget {
+  const _InternetSettingsPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = AppTokens.of(context);
+    final settings = ref.watch(internetSpeedTestSettingsControllerProvider);
+    final controller = ref.read(
+      internetSpeedTestSettingsControllerProvider.notifier,
+    );
+    final customUrl = settings.customLibrespeedUrl;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Internet speed test')),
+      body: SafeArea(
+        child: AppPage(
+          children: [
+            const AppSectionHeader(
+              title: 'Backend',
+              subtitle:
+                  'Choose which public internet speed test backend this device uses.',
+            ),
+            SizedBox(height: tokens.sectionGap),
+            AppSettingsGroup(
+              children: [
+                _ThemeOptionRow(
+                  title: 'Public Librespeed (Recommended)',
+                  subtitle: 'Use the shared Librespeed public backend.',
+                  isSelected:
+                      settings.backend ==
+                      InternetSpeedTestBackendPreference.publicLibrespeed,
+                  onTap: () => controller.setBackend(
+                    InternetSpeedTestBackendPreference.publicLibrespeed,
+                  ),
+                ),
+                AppSettingsRow(
+                  icon: Icons.link_outlined,
+                  title: 'Custom Librespeed',
+                  subtitle: customUrl?.isNotEmpty == true
+                      ? customUrl
+                      : 'Set the base URL for your own Librespeed instance.',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const _CustomLibrespeedSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+                _ThemeOptionRow(
+                  title: 'Cloudflare',
+                  subtitle: 'Use the Cloudflare public speed test backend.',
+                  isSelected:
+                      settings.backend ==
+                      InternetSpeedTestBackendPreference.cloudflare,
+                  onTap: () => controller.setBackend(
+                    InternetSpeedTestBackendPreference.cloudflare,
+                  ),
+                ),
+                _ThemeOptionRow(
+                  title: 'Measurement Lab',
+                  subtitle: 'Use speed.measurementlab.net.',
+                  isSelected:
+                      settings.backend ==
+                      InternetSpeedTestBackendPreference.measurementLab,
+                  onTap: () => controller.setBackend(
+                    InternetSpeedTestBackendPreference.measurementLab,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _UiSettingsPage extends ConsumerWidget {
   const _UiSettingsPage();
 
@@ -403,15 +505,14 @@ class _UiSettingsPage extends ConsumerWidget {
     final themeController = ref.read(themeModeControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('UI'),
-      ),
+      appBar: AppBar(title: const Text('UI')),
       body: SafeArea(
         child: AppPage(
           children: [
             const AppSectionHeader(
               title: 'Options',
-              subtitle: 'Choose how the app decides between light and dark mode.',
+              subtitle:
+                  'Choose how the app decides between light and dark mode.',
             ),
             SizedBox(height: tokens.sectionGap),
             AppSettingsGroup(
@@ -420,21 +521,132 @@ class _UiSettingsPage extends ConsumerWidget {
                   title: 'System (Default)',
                   subtitle: 'Follow the device theme automatically.',
                   isSelected: themePreference == AppThemePreference.system,
-                  onTap: () => themeController.setPreference(AppThemePreference.system),
+                  onTap: () =>
+                      themeController.setPreference(AppThemePreference.system),
                 ),
                 _ThemeOptionRow(
                   title: 'Light',
                   subtitle: 'Always use the light theme.',
                   isSelected: themePreference == AppThemePreference.light,
-                  onTap: () => themeController.setPreference(AppThemePreference.light),
+                  onTap: () =>
+                      themeController.setPreference(AppThemePreference.light),
                 ),
                 _ThemeOptionRow(
                   title: 'Dark',
                   subtitle: 'Always use the dark theme.',
                   isSelected: themePreference == AppThemePreference.dark,
-                  onTap: () => themeController.setPreference(AppThemePreference.dark),
+                  onTap: () =>
+                      themeController.setPreference(AppThemePreference.dark),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomLibrespeedSettingsPage extends ConsumerStatefulWidget {
+  const _CustomLibrespeedSettingsPage();
+
+  @override
+  ConsumerState<_CustomLibrespeedSettingsPage> createState() =>
+      _CustomLibrespeedSettingsPageState();
+}
+
+class _CustomLibrespeedSettingsPageState
+    extends ConsumerState<_CustomLibrespeedSettingsPage> {
+  late final TextEditingController _controller;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final currentValue = ref
+        .read(internetSpeedTestSettingsControllerProvider)
+        .customLibrespeedUrl;
+    _controller = TextEditingController(text: currentValue ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final value = _controller.text.trim();
+    final parsed = Uri.tryParse(value);
+    final isValid =
+        parsed != null &&
+        parsed.hasScheme &&
+        parsed.hasAuthority &&
+        (parsed.scheme == 'http' || parsed.scheme == 'https');
+
+    if (!isValid) {
+      setState(() {
+        _errorMessage = AppMessages.customLibrespeedUrlRequired;
+      });
+      return;
+    }
+
+    await ref
+        .read(internetSpeedTestSettingsControllerProvider.notifier)
+        .saveCustomLibrespeedUrlAndSelect(value);
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AppTokens.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Custom Librespeed')),
+      body: SafeArea(
+        child: AppPage(
+          children: [
+            const AppSectionHeader(
+              title: 'Server URL',
+              subtitle: 'Enter the base URL for your own Librespeed instance.',
+            ),
+            SizedBox(height: tokens.sectionGap),
+            AppPanel(
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: InputDecoration(
+                      labelText: 'Librespeed URL',
+                      hintText: 'https://speed.example.com/',
+                      errorText: _errorMessage,
+                    ),
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() {
+                          _errorMessage = null;
+                        });
+                      }
+                    },
+                  ),
+                  SizedBox(height: tokens.spacing.regular),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton(
+                      onPressed: _save,
+                      child: const Text('Use custom Librespeed'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -458,15 +670,14 @@ class _ServerSettingsPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Server'),
-      ),
+      appBar: AppBar(title: const Text('Server')),
       body: SafeArea(
         child: AppPage(
           children: [
             const AppSectionHeader(
               title: 'Connection',
-              subtitle: 'Review the active WHM server and switch to a different one.',
+              subtitle:
+                  'Review the active WHM server and switch to a different one.',
             ),
             SizedBox(height: tokens.sectionGap),
             AppPanel(
@@ -539,7 +750,8 @@ class SiteSettingsPage extends StatelessWidget {
           children: [
             const AppSectionHeader(
               title: 'Available Sites',
-              subtitle: 'This is the active site for measurement capture and uploads.',
+              subtitle:
+                  'This is the active site for measurement capture and uploads.',
             ),
             SizedBox(height: tokens.sectionGap),
             if (!hasValidSelection)
@@ -575,8 +787,11 @@ class SiteSettingsPage extends StatelessWidget {
                   for (final site in sites)
                     _ThemeOptionRow(
                       title: site.name,
-                      subtitle: site.description?.isNotEmpty == true ? site.description! : site.slug,
-                      isSelected: hasValidSelection && selectedSiteSlug == site.slug,
+                      subtitle: site.description?.isNotEmpty == true
+                          ? site.description!
+                          : site.slug,
+                      isSelected:
+                          hasValidSelection && selectedSiteSlug == site.slug,
                       onTap: () {
                         onSelectSite(site.slug);
                         Navigator.of(context).pop();
@@ -637,9 +852,7 @@ String _themePreferenceLabel(AppThemePreference preference) {
 }
 
 class _MissingSelectedSiteView extends StatelessWidget {
-  const _MissingSelectedSiteView({
-    required this.onOpenSettings,
-  });
+  const _MissingSelectedSiteView({required this.onOpenSettings});
 
   final VoidCallback onOpenSettings;
 
