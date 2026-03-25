@@ -109,15 +109,18 @@ void main() {
         'floor_maps': [
           {
             'id': 'map-1',
+            'slug': 'floor-1',
             'name': 'Main Floor',
             'image_path': '/floorplans/default.svg',
             'image_width': 640,
             'image_height': 463,
+            'display_order': 1,
           },
         ],
         'points': [
           {
             'id': 'point-1',
+            'floor_map_id': 'map-1',
             'label': 'Entry',
             'x': 100,
             'y': 200,
@@ -127,8 +130,10 @@ void main() {
       });
 
       expect(site.floorMaps, hasLength(1));
+      expect(site.floorMaps.first.slug, 'floor-1');
       expect(site.floorMaps.first.imagePath, '/floorplans/default.svg');
       expect(site.points, hasLength(1));
+      expect(site.points.first.floorMapId, 'map-1');
       expect(site.points.first.label, 'Entry');
       expect(site.points.first.x, 100);
       expect(site.points.first.y, 200);

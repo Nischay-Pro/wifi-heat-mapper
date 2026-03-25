@@ -3,11 +3,7 @@ import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 
 class AppPage extends StatelessWidget {
-  const AppPage({
-    super.key,
-    required this.children,
-    this.maxWidth,
-  });
+  const AppPage({super.key, required this.children, this.maxWidth});
 
   final List<Widget> children;
   final double? maxWidth;
@@ -76,11 +72,7 @@ class AppSectionHeader extends StatelessWidget {
 }
 
 class AppPanel extends StatelessWidget {
-  const AppPanel({
-    super.key,
-    required this.child,
-    this.padding,
-  });
+  const AppPanel({super.key, required this.child, this.padding});
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
@@ -121,12 +113,7 @@ class AppBanner extends StatelessWidget {
         children: [
           Icon(icon, color: iconColor),
           SizedBox(width: tokens.spacing.compact),
-          Expanded(
-            child: Text(
-              message,
-              style: textTheme.bodyMedium,
-            ),
-          ),
+          Expanded(child: Text(message, style: textTheme.bodyMedium)),
         ],
       ),
     );
@@ -134,11 +121,7 @@ class AppBanner extends StatelessWidget {
 }
 
 class AppMetricTile extends StatelessWidget {
-  const AppMetricTile({
-    super.key,
-    required this.label,
-    required this.value,
-  });
+  const AppMetricTile({super.key, required this.label, required this.value});
 
   final String label;
   final String value;
@@ -168,11 +151,7 @@ class AppMetricTile extends StatelessWidget {
 }
 
 class AppInfoRow extends StatelessWidget {
-  const AppInfoRow({
-    super.key,
-    required this.label,
-    required this.value,
-  });
+  const AppInfoRow({super.key, required this.label, required this.value});
 
   final String label;
   final String value;
@@ -188,12 +167,10 @@ class AppInfoRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 112,
+            width: 124,
             child: Text(label, style: textTheme.labelMedium),
           ),
-          Expanded(
-            child: Text(value, style: textTheme.bodyMedium),
-          ),
+          Expanded(child: Text(value, style: textTheme.bodyMedium)),
         ],
       ),
     );
@@ -225,10 +202,7 @@ class AppBusyIconButton extends StatelessWidget {
 }
 
 class AppSettingsGroup extends StatelessWidget {
-  const AppSettingsGroup({
-    super.key,
-    required this.children,
-  });
+  const AppSettingsGroup({super.key, required this.children});
 
   final List<Widget> children;
 
@@ -285,11 +259,7 @@ class AppSettingsRow extends StatelessWidget {
       title: Text(title, style: textTheme.titleMedium),
       subtitle: subtitle == null
           ? null
-          : Text(
-              subtitle!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+          : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
     );
   }

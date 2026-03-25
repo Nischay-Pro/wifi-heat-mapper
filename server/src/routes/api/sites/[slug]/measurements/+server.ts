@@ -139,7 +139,7 @@ function parsePoint(value: unknown): MeasurementPointInput {
 	const point = requireObject(value, "point");
 
 	return {
-		id: parseOptionalString(point.id, "point.id", 128),
+		id: parseRequiredString(point.id, "point.id", 128),
 		label: parseRequiredString(point.label, "point.label", 128),
 		x: parseOptionalInteger(point.x, "point.x") ?? 0,
 		y: parseOptionalInteger(point.y, "point.y") ?? 0,

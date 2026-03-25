@@ -26,15 +26,37 @@ export async function getSiteBySlug(slug: string) {
 	const [floorMaps, points, sessions] = await Promise.all([
 		db
 			.selectFrom("floor_maps")
-			.select(["id", "site_id", "name", "image_path", "image_width", "image_height", "created_at", "updated_at"])
+			.select([
+				"id",
+				"site_id",
+				"slug",
+				"name",
+				"image_path",
+				"image_width",
+				"image_height",
+				"display_order",
+				"created_at",
+				"updated_at"
+			])
 			.where("site_id", "=", site.id)
+			.orderBy("display_order", "asc")
 			.orderBy("created_at", "asc")
 			.execute(),
 		db
 			.selectFrom("points")
-			.select(["id", "site_id", "label", "x", "y", "is_base_station", "created_at", "updated_at"])
-			.where("site_id", "=", site.id)
-			.orderBy("created_at", "asc")
+			.innerJoin("floor_maps", "floor_maps.id", "points.floor_map_id")
+			.select([
+				"points.id",
+				"points.floor_map_id",
+				"points.label",
+				"points.x",
+				"points.y",
+				"points.is_base_station",
+				"points.created_at",
+				"points.updated_at"
+			])
+			.where("floor_maps.site_id", "=", site.id)
+			.orderBy("points.created_at", "asc")
 			.execute(),
 		db
 			.selectFrom("measurement_sessions")

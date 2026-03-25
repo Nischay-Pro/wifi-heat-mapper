@@ -8,6 +8,7 @@ export async function listMeasurements(limit = 100, siteId?: string) {
 		.selectFrom("measurements")
 		.innerJoin("sites", "sites.id", "measurements.site_id")
 		.innerJoin("points", "points.id", "measurements.point_id")
+		.innerJoin("floor_maps", "floor_maps.id", "points.floor_map_id")
 		.innerJoin("devices", "devices.id", "measurements.device_id")
 		.leftJoin("measurement_sessions", "measurement_sessions.id", "measurements.session_id")
 		.select([
@@ -19,6 +20,9 @@ export async function listMeasurements(limit = 100, siteId?: string) {
 			"sites.id as site_id",
 			"sites.slug as site_slug",
 			"sites.name as site_name",
+			"floor_maps.id as floor_map_id",
+			"floor_maps.slug as floor_map_slug",
+			"floor_maps.name as floor_map_name",
 			"points.id as point_id",
 			"points.label as point_label",
 			"points.x as point_x",
@@ -50,7 +54,7 @@ export interface MeasurementDeviceInput {
 }
 
 export interface MeasurementPointInput {
-	id?: string;
+	id: string;
 	label: string;
 	x: number;
 	y: number;
@@ -96,40 +100,16 @@ export async function createMeasurement(input: CreateMeasurementInput) {
 			.returning(["id", "slug", "name", "platform", "model"])
 			.executeTakeFirstOrThrow();
 
-		let point;
+		const point = await trx
+			.selectFrom("points")
+			.innerJoin("floor_maps", "floor_maps.id", "points.floor_map_id")
+			.select(["points.id", "points.label", "points.x", "points.y", "points.is_base_station"])
+			.where("floor_maps.site_id", "=", input.siteId)
+			.where("points.id", "=", input.point.id)
+			.executeTakeFirst();
 
-		if (input.point.id) {
-			point = await trx
-				.selectFrom("points")
-				.select(["id", "label", "x", "y", "is_base_station"])
-				.where("site_id", "=", input.siteId)
-				.where("id", "=", input.point.id)
-				.executeTakeFirst();
-
-			if (!point) {
-				throw new PointNotFoundError(input.point.id);
-			}
-		} else {
-			point = await trx
-				.selectFrom("points")
-				.select(["id", "label", "x", "y", "is_base_station"])
-				.where("site_id", "=", input.siteId)
-				.where("label", "=", input.point.label)
-				.executeTakeFirst();
-
-			if (!point) {
-				point = await trx
-					.insertInto("points")
-					.values({
-						site_id: input.siteId,
-						label: input.point.label,
-						x: input.point.x,
-						y: input.point.y,
-						is_base_station: input.point.is_base_station
-					})
-					.returning(["id", "label", "x", "y", "is_base_station"])
-					.executeTakeFirstOrThrow();
-			}
+		if (!point) {
+			throw new PointNotFoundError(input.point.id);
 		}
 
 		const measurement = await trx

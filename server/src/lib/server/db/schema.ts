@@ -55,17 +55,19 @@ export interface SitesTable {
 export interface FloorMapsTable {
 	id: Generated<string>;
 	site_id: string;
+	slug: string;
 	name: string;
 	image_path: string | null;
 	image_width: number | null;
 	image_height: number | null;
+	display_order: number;
 	created_at: Timestamp;
 	updated_at: Timestamp;
 }
 
 export interface PointsTable {
 	id: Generated<string>;
-	site_id: string;
+	floor_map_id: string;
 	label: string | null;
 	x: number;
 	y: number;

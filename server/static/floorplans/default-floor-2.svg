@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="736" height="497" viewBox="0 0 736 497" fill="none">
+  <rect width="736" height="497" fill="#FAFAFA"/>
+  <g stroke="#8A8A8A" stroke-width="6" stroke-linecap="square">
+    <path d="M21 23H713V476H21V23Z"/>
+    <path d="M132 23V135H21"/>
+    <path d="M248 23V136"/>
+    <path d="M420 23V136"/>
+    <path d="M552 23V189"/>
+    <path d="M248 136H420"/>
+    <path d="M132 192H324"/>
+    <path d="M324 136V476"/>
+    <path d="M516 189V476"/>
+    <path d="M516 302H713"/>
+    <path d="M607 302V476"/>
+  </g>
+  <g stroke="#A5A5A5" stroke-width="2" fill="none">
+    <rect x="43" y="43" width="70" height="94"/>
+    <rect x="169" y="32" width="67" height="43"/>
+    <rect x="170" y="80" width="34" height="26"/>
+    <rect x="166" y="111" width="26" height="39"/>
+    <rect x="233" y="81" width="22" height="25"/>
+    <rect x="447" y="29" width="74" height="95"/>
+    <rect x="458" y="39" width="19" height="18"/>
+    <rect x="485" y="39" width="19" height="18"/>
+    <rect x="595" y="43" width="69" height="70"/>
+    <rect x="643" y="43" width="15" height="92"/>
+    <rect x="554" y="171" width="120" height="84"/>
+    <rect x="294" y="194" width="112" height="58"/>
+    <rect x="575" y="337" width="110" height="78"/>
+    <rect x="574" y="338" width="31" height="31"/>
+    <rect x="622" y="347" width="24" height="40"/>
+    <rect x="49" y="260" width="29" height="92"/>
+    <rect x="63" y="406" width="28" height="22"/>
+    <rect x="99" y="387" width="52" height="42"/>
+    <rect x="170" y="283" width="104" height="93"/>
+    <rect x="255" y="286" width="17" height="83"/>
+    <circle cx="119" cy="383" r="23"/>
+    <circle cx="69" cy="92" r="35"/>
+    <ellipse cx="378" cy="211" rx="13" ry="24"/>
+    <rect x="357" y="243" width="52" height="34" rx="16"/>
+    <rect x="451" y="429" width="15" height="47"/>
+    <rect x="51" y="451" width="133" height="10"/>
+    <rect x="324" y="448" width="192" height="10"/>
+  </g>
+  <g stroke="#A5A5A5" stroke-width="2">
+    <path d="M123 111A41 41 0 0 1 164 152"/>
+    <path d="M287 192A41 41 0 0 0 246 151"/>
+    <path d="M552 190A41 41 0 0 1 593 231"/>
+    <path d="M617 190A41 41 0 0 0 658 231"/>
+    <path d="M516 304A41 41 0 0 1 475 345"/>
+    <path d="M607 302A41 41 0 0 1 566 343"/>
+    <path d="M420 136A36 36 0 0 0 384 172"/>
+    <path d="M324 136A36 36 0 0 1 288 172"/>
+  </g>
+</svg>

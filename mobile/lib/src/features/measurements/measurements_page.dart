@@ -41,12 +41,14 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     with WidgetsBindingObserver {
   WifiMetadata _wifiMetadata = const WifiMetadata();
   SiteDetail? _siteDetail;
+  FloorMap? _selectedFloorMap;
   SitePoint? _selectedPoint;
   SitePoint? _lastRecordedPoint;
   InternetMeasurementResult? _internetResult;
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isRequestInFlight = false;
+  bool _isSiteDetailRequestInFlight = false;
   bool _isLoadingSiteDetail = true;
   bool _isRecordingMeasurement = false;
   String? _errorMessage;
@@ -60,7 +62,9 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
   );
   double _displayedOverallProgress = 0;
   DateTime? _lastRecordedAt;
-  Timer? _pollTimer;
+  Timer? _metadataPollTimer;
+  Timer? _siteDetailPollTimer;
+  String? _lastSnackbarMessage;
 
   @override
   void initState() {
@@ -76,6 +80,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedSiteSlug != widget.selectedSiteSlug) {
       _siteDetail = null;
+      _selectedFloorMap = null;
       _selectedPoint = null;
       _lastRecordedPoint = null;
       _siteDetailError = null;
@@ -100,7 +105,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     if (state == AppLifecycleState.resumed) {
       _startPolling();
       _loadMetadata();
-      _loadSiteDetail();
+      _loadSiteDetail(autoSelectFirstPoint: false);
       return;
     }
 
@@ -116,6 +121,10 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     bool showLoading = false,
     bool autoSelectFirstPoint = true,
   }) async {
+    if (_isSiteDetailRequestInFlight) {
+      return;
+    }
+
     final serverUrl = ref
         .read(serverConnectionControllerProvider)
         .connectedServerUrl;
@@ -126,12 +135,15 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
       setState(() {
         _siteDetail = null;
+        _selectedFloorMap = null;
         _selectedPoint = null;
         _siteDetailError = AppMessages.serverUnavailable;
         _isLoadingSiteDetail = false;
       });
       return;
     }
+
+    _isSiteDetailRequestInFlight = true;
 
     if (mounted && showLoading) {
       setState(() {
@@ -151,20 +163,53 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         return;
       }
 
+      final previousFloorId = _selectedFloorMap?.id;
+      final previousPointId = _selectedPoint?.id;
+      final selectedFloorMap =
+          siteDetail.floorMaps.any(
+            (floorMap) => floorMap.id == _selectedFloorMap?.id,
+          )
+          ? siteDetail.floorMaps.firstWhere(
+              (floorMap) => floorMap.id == _selectedFloorMap!.id,
+            )
+          : (siteDetail.floorMaps.isNotEmpty
+                ? siteDetail.floorMaps.first
+                : null);
+      final availablePoints = selectedFloorMap == null
+          ? const <SitePoint>[]
+          : siteDetail.points
+                .where((point) => point.floorMapId == selectedFloorMap.id)
+                .toList(growable: false);
+      final floorSelectionChanged =
+          previousFloorId != null && selectedFloorMap?.id != previousFloorId;
       final selectedPoint =
-          siteDetail.points.any((point) => point.id == _selectedPoint?.id)
-          ? siteDetail.points.firstWhere(
+          !floorSelectionChanged &&
+              availablePoints.any((point) => point.id == _selectedPoint?.id)
+          ? availablePoints.firstWhere(
               (point) => point.id == _selectedPoint!.id,
             )
-          : (autoSelectFirstPoint && siteDetail.points.isNotEmpty
-                ? siteDetail.points.first
+          : (autoSelectFirstPoint && availablePoints.isNotEmpty
+                ? availablePoints.first
                 : null);
+      final pointSelectionChanged =
+          previousPointId != null && selectedPoint?.id != previousPointId;
+      final pointNoLongerExists =
+          previousPointId != null &&
+          !availablePoints.any((point) => point.id == previousPointId);
 
       setState(() {
         _siteDetail = siteDetail;
+        _selectedFloorMap = selectedFloorMap;
         _selectedPoint = selectedPoint;
         _siteDetailError = null;
         _isLoadingSiteDetail = false;
+        if (pointNoLongerExists) {
+          _measurementSubmissionMessage = AppMessages.pointNoLongerExists;
+          _showSnackbar(AppMessages.pointNoLongerExists);
+        } else if (!_isRecordingMeasurement &&
+            (floorSelectionChanged || pointSelectionChanged)) {
+          _measurementSubmissionMessage = null;
+        }
       });
     } on ApiException catch (error) {
       if (!mounted) {
@@ -173,6 +218,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
       setState(() {
         _siteDetail = null;
+        _selectedFloorMap = null;
         _selectedPoint = null;
         _siteDetailError = error.message;
         _isLoadingSiteDetail = false;
@@ -184,6 +230,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
       setState(() {
         _siteDetail = null;
+        _selectedFloorMap = null;
         _selectedPoint = null;
         _siteDetailError = AppMessages.serverUnavailable;
         _isLoadingSiteDetail = false;
@@ -195,24 +242,34 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
       setState(() {
         _siteDetail = null;
+        _selectedFloorMap = null;
         _selectedPoint = null;
         _siteDetailError = AppMessages.floorplanLoadFailed;
         _isLoadingSiteDetail = false;
       });
+    } finally {
+      _isSiteDetailRequestInFlight = false;
     }
   }
 
   void _startPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(
+    _metadataPollTimer?.cancel();
+    _metadataPollTimer = Timer.periodic(
       const Duration(seconds: 1),
       (_) => _loadMetadata(),
+    );
+    _siteDetailPollTimer?.cancel();
+    _siteDetailPollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadSiteDetail(autoSelectFirstPoint: false),
     );
   }
 
   void _stopPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
+    _metadataPollTimer?.cancel();
+    _metadataPollTimer = null;
+    _siteDetailPollTimer?.cancel();
+    _siteDetailPollTimer = null;
   }
 
   Future<void> _loadMetadata({bool showLoading = false}) async {
@@ -275,6 +332,17 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     }
   }
 
+  void _showSnackbar(String message) {
+    if (!mounted || _lastSnackbarMessage == message) {
+      return;
+    }
+
+    _lastSnackbarMessage = message;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _recordMeasurement() async {
     if (_isRecordingMeasurement) {
       return;
@@ -301,6 +369,8 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       });
       return;
     }
+
+    final measurementPoint = _selectedPoint!;
 
     setState(() {
       _isRecordingMeasurement = true;
@@ -346,7 +416,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       if (serverUrl == null || serverUrl.isEmpty) {
         setState(() {
           _internetResult = result;
-          _lastRecordedPoint = _selectedPoint;
+          _lastRecordedPoint = measurementPoint;
           _lastRecordedAt = DateTime.now();
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
@@ -370,7 +440,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               wifiMetadata: _wifiMetadata,
               internetResult: result,
               measuredAt: measuredAt,
-              point: _selectedPoint!,
+              point: measurementPoint,
             );
 
         if (!mounted) {
@@ -379,7 +449,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
         setState(() {
           _internetResult = result;
-          _lastRecordedPoint = _selectedPoint;
+          _lastRecordedPoint = measurementPoint;
           _lastRecordedAt = measuredAt;
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
@@ -414,7 +484,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
         setState(() {
           _internetResult = result;
-          _lastRecordedPoint = _selectedPoint;
+          _lastRecordedPoint = measurementPoint;
           _lastRecordedAt = DateTime.now();
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
@@ -429,7 +499,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
 
         setState(() {
           _internetResult = result;
-          _lastRecordedPoint = _selectedPoint;
+          _lastRecordedPoint = measurementPoint;
           _lastRecordedAt = DateTime.now();
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
@@ -501,6 +571,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       onOpenSiteSettings: widget.onOpenSiteSettings,
       wifiMetadata: _wifiMetadata,
       siteDetail: _siteDetail,
+      selectedFloorMap: _selectedFloorMap,
       selectedPoint: _selectedPoint,
       internetResult: _internetResult,
       lastRecordedPoint: _lastRecordedPoint,
@@ -521,6 +592,22 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _selectedPoint = point;
           _measurementSubmissionMessage = null;
           _internetMeasurementError = null;
+          _lastSnackbarMessage = null;
+        });
+      },
+      onSelectFloorMap: (floorMap) {
+        final pointsForFloor = (_siteDetail?.points ?? const <SitePoint>[])
+            .where((point) => point.floorMapId == floorMap.id)
+            .toList(growable: false);
+
+        setState(() {
+          _selectedFloorMap = floorMap;
+          _selectedPoint = pointsForFloor.isNotEmpty
+              ? pointsForFloor.first
+              : null;
+          _measurementSubmissionMessage = null;
+          _internetMeasurementError = null;
+          _lastSnackbarMessage = null;
         });
       },
     );
@@ -536,6 +623,7 @@ class MeasurementsView extends StatelessWidget {
     required this.onOpenSiteSettings,
     required this.wifiMetadata,
     required this.siteDetail,
+    required this.selectedFloorMap,
     required this.selectedPoint,
     required this.internetResult,
     required this.lastRecordedPoint,
@@ -552,6 +640,7 @@ class MeasurementsView extends StatelessWidget {
     required this.lastRecordedAt,
     required this.onRecordMeasurement,
     required this.onSelectPoint,
+    required this.onSelectFloorMap,
   });
 
   final String selectedSiteSlug;
@@ -560,6 +649,7 @@ class MeasurementsView extends StatelessWidget {
   final VoidCallback? onOpenSiteSettings;
   final WifiMetadata wifiMetadata;
   final SiteDetail? siteDetail;
+  final FloorMap? selectedFloorMap;
   final SitePoint? selectedPoint;
   final InternetMeasurementResult? internetResult;
   final SitePoint? lastRecordedPoint;
@@ -576,20 +666,24 @@ class MeasurementsView extends StatelessWidget {
   final DateTime? lastRecordedAt;
   final Future<void> Function() onRecordMeasurement;
   final ValueChanged<SitePoint> onSelectPoint;
+  final ValueChanged<FloorMap> onSelectFloorMap;
 
   @override
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final activeFloorMap = siteDetail?.floorMaps.isNotEmpty == true
-        ? siteDetail!.floorMaps.first
-        : null;
+    final activeFloorMap = selectedFloorMap;
+    final pointsForSelectedFloor = activeFloorMap == null
+        ? const <SitePoint>[]
+        : (siteDetail?.points ?? const <SitePoint>[])
+              .where((point) => point.floorMapId == activeFloorMap.id)
+              .toList(growable: false);
     final hasUsableFloorplan =
         activeFloorMap != null &&
         activeFloorMap.imagePath != null &&
         activeFloorMap.imagePath!.isNotEmpty;
-    final hasPoints = siteDetail?.points.isNotEmpty == true;
+    final hasPoints = pointsForSelectedFloor.isNotEmpty;
     final floorplanStatusMessage =
         siteDetailError ??
         (siteDetail == null
@@ -685,7 +779,7 @@ class MeasurementsView extends StatelessWidget {
                 Text('Floorplan and points', style: textTheme.titleLarge),
                 SizedBox(height: tokens.spacing.compact),
                 Text(
-                  'Select a point on the site floorplan before recording a measurement.',
+                  'Choose a floor, then select a point on that floorplan before recording a measurement.',
                   style: textTheme.bodyMedium,
                 ),
                 SizedBox(height: tokens.spacing.regular),
@@ -703,14 +797,24 @@ class MeasurementsView extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _FloorMapSelector(
+                        floorMaps: siteDetail!.floorMaps,
+                        selectedFloorMap: activeFloorMap,
+                        onSelectFloorMap: onSelectFloorMap,
+                      ),
+                      SizedBox(height: tokens.spacing.regular),
                       _FloorplanPreview(
                         serverUrl: connectedServerUrl,
                         floorMap: activeFloorMap,
-                        points: siteDetail!.points,
+                        points: pointsForSelectedFloor,
                         selectedPoint: selectedPoint,
                         onSelectPoint: onSelectPoint,
                       ),
                       SizedBox(height: tokens.spacing.regular),
+                      AppInfoRow(
+                        label: 'Selected floor',
+                        value: activeFloorMap.name,
+                      ),
                       AppInfoRow(
                         label: 'Selected point',
                         value:
@@ -1245,6 +1349,138 @@ class _FloorplanPreview extends StatelessWidget {
 
     final baseUri = Uri.parse(serverUrl);
     return baseUri.resolve(imagePath).toString();
+  }
+}
+
+class _FloorMapSelector extends StatelessWidget {
+  const _FloorMapSelector({
+    required this.floorMaps,
+    required this.selectedFloorMap,
+    required this.onSelectFloorMap,
+  });
+
+  final List<FloorMap> floorMaps;
+  final FloorMap selectedFloorMap;
+  final ValueChanged<FloorMap> onSelectFloorMap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPanel(
+      padding: EdgeInsets.zero,
+      child: ListTile(
+        onTap: () async {
+          final selected = await showModalBottomSheet<FloorMap>(
+            context: context,
+            showDragHandle: true,
+            isScrollControlled: true,
+            builder: (context) => _FloorMapPickerSheet(
+              floorMaps: floorMaps,
+              selectedFloorMap: selectedFloorMap,
+            ),
+          );
+
+          if (selected != null && selected.id != selectedFloorMap.id) {
+            onSelectFloorMap(selected);
+          }
+        },
+        leading: const Icon(Icons.layers_outlined),
+        title: const Text('Floor'),
+        subtitle: Text(selectedFloorMap.name),
+        trailing: const Icon(Icons.expand_more),
+      ),
+    );
+  }
+}
+
+class _FloorMapPickerSheet extends StatefulWidget {
+  const _FloorMapPickerSheet({
+    required this.floorMaps,
+    required this.selectedFloorMap,
+  });
+
+  final List<FloorMap> floorMaps;
+  final FloorMap selectedFloorMap;
+
+  @override
+  State<_FloorMapPickerSheet> createState() => _FloorMapPickerSheetState();
+}
+
+class _FloorMapPickerSheetState extends State<_FloorMapPickerSheet> {
+  late final TextEditingController _searchController;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AppTokens.of(context);
+    final showSearch = widget.floorMaps.length > 5;
+    final normalizedQuery = _query.trim().toLowerCase();
+    final filteredFloorMaps = normalizedQuery.isEmpty
+        ? widget.floorMaps
+        : widget.floorMaps
+              .where((floorMap) {
+                return floorMap.name.toLowerCase().contains(normalizedQuery) ||
+                    floorMap.slug.toLowerCase().contains(normalizedQuery);
+              })
+              .toList(growable: false);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: tokens.pagePadding,
+          right: tokens.pagePadding,
+          bottom: tokens.pagePadding,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showSearch) ...[
+              TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _query = value;
+                  });
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Search floors',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              SizedBox(height: tokens.spacing.regular),
+            ],
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: filteredFloorMaps.length,
+                itemBuilder: (context, index) {
+                  final floorMap = filteredFloorMaps[index];
+                  return ListTile(
+                    title: Text(floorMap.name),
+                    trailing: floorMap.id == widget.selectedFloorMap.id
+                        ? const Icon(Icons.check_circle)
+                        : null,
+                    onTap: () => Navigator.of(context).pop(floorMap),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
