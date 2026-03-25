@@ -367,15 +367,12 @@ class _SettingsTab extends ConsumerWidget {
       children: [
         Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
         SizedBox(height: tokens.sectionGap),
-        const AppSectionNote(
-          message: 'App and site configuration for this device.',
-        ),
-        SizedBox(height: tokens.sectionGap),
+        const AppSectionLabel(label: 'Appearance'),
+        SizedBox(height: tokens.spacing.compact),
         AppSettingsGroup(
           flat: true,
           children: [
             AppSettingsRow(
-              icon: Icons.palette_outlined,
               title: 'App Theme',
               subtitle: _themePreferenceLabel(themePreference),
               onTap: () {
@@ -386,8 +383,15 @@ class _SettingsTab extends ConsumerWidget {
                 );
               },
             ),
+          ],
+        ),
+        SizedBox(height: tokens.sectionGap),
+        const AppSectionLabel(label: 'Measurement'),
+        SizedBox(height: tokens.spacing.compact),
+        AppSettingsGroup(
+          flat: true,
+          children: [
             AppSettingsRow(
-              icon: Icons.public_outlined,
               title: 'Internet speed test',
               subtitle: internetSettings.backendLabel,
               onTap: () {
@@ -399,22 +403,6 @@ class _SettingsTab extends ConsumerWidget {
               },
             ),
             AppSettingsRow(
-              icon: Icons.storage_outlined,
-              title: 'Server',
-              subtitle: connectedServerUrl ?? 'Not connected',
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => _ServerSettingsPage(
-                      connectedServerUrl: connectedServerUrl,
-                      onChangeServer: onChangeServer,
-                    ),
-                  ),
-                );
-              },
-            ),
-            AppSettingsRow(
-              icon: Icons.location_on_outlined,
               title: 'Site',
               subtitle: selectedSiteSlug ?? AppMessages.invalidSelectedSite,
               onTap: () {
@@ -426,6 +414,28 @@ class _SettingsTab extends ConsumerWidget {
                       isRefreshingSites: isRefreshingSites,
                       onRefreshSites: onRefreshSites,
                       onSelectSite: onSelectSite,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        SizedBox(height: tokens.sectionGap),
+        const AppSectionLabel(label: 'Connection'),
+        SizedBox(height: tokens.spacing.compact),
+        AppSettingsGroup(
+          flat: true,
+          children: [
+            AppSettingsRow(
+              title: 'Server',
+              subtitle: connectedServerUrl ?? 'Not connected',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _ServerSettingsPage(
+                      connectedServerUrl: connectedServerUrl,
+                      onChangeServer: onChangeServer,
                     ),
                   ),
                 );
@@ -754,7 +764,6 @@ class _CustomLibrespeedSettingsPageState
               flat: true,
               children: [
                 AppSettingsRow(
-                  icon: Icons.tune,
                   title: 'Advanced options',
                   onTap: () {
                     Navigator.of(context).push(
@@ -805,7 +814,6 @@ class _HttpBackendSettingsPage extends ConsumerWidget {
               flat: true,
               children: [
                 AppSettingsRow(
-                  icon: Icons.tune,
                   title: 'Advanced options',
                   onTap: () {
                     Navigator.of(context).push(
@@ -851,7 +859,6 @@ class _MeasurementLabSettingsPage extends ConsumerWidget {
               flat: true,
               children: [
                 AppSettingsRow(
-                  icon: Icons.tune,
                   title: 'Advanced options',
                   onTap: () {
                     Navigator.of(context).push(
@@ -1058,14 +1065,11 @@ class _HttpBackendAdvancedSettingsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
+                  AppNumericBox(
                     controller: _parallelStreamsController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Parallel streams',
-                      hintText: '4',
-                      errorText: _parallelStreamsError,
-                    ),
+                    label: 'Parallel streams',
+                    hintText: '2',
+                    errorText: _parallelStreamsError,
                     onChanged: (_) {
                       if (_parallelStreamsError != null) {
                         setState(() {
@@ -1073,7 +1077,7 @@ class _HttpBackendAdvancedSettingsPageState
                         });
                       }
                     },
-                    onSubmitted: (_) => _saveParallelStreams(),
+                    onSubmitted: _saveParallelStreams,
                   ),
                   SizedBox(height: tokens.spacing.regular),
                   Align(
@@ -1091,14 +1095,11 @@ class _HttpBackendAdvancedSettingsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
+                  AppNumericBox(
                     controller: _latencySampleCountController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Latency samples',
-                      hintText: '10',
-                      errorText: _latencySampleCountError,
-                    ),
+                    label: 'Latency samples',
+                    hintText: '10',
+                    errorText: _latencySampleCountError,
                     onChanged: (_) {
                       if (_latencySampleCountError != null) {
                         setState(() {
@@ -1106,7 +1107,7 @@ class _HttpBackendAdvancedSettingsPageState
                         });
                       }
                     },
-                    onSubmitted: (_) => _saveLatencySampleCount(),
+                    onSubmitted: _saveLatencySampleCount,
                   ),
                   SizedBox(height: tokens.spacing.regular),
                   Align(
@@ -1290,14 +1291,11 @@ class _MeasurementLabAdvancedSettingsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
+                  AppNumericBox(
                     controller: _downloadDurationController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Download duration (seconds)',
-                      hintText: '15',
-                      errorText: _downloadDurationError,
-                    ),
+                    label: 'Download duration (seconds)',
+                    hintText: '15',
+                    errorText: _downloadDurationError,
                     onChanged: (_) {
                       if (_downloadDurationError != null) {
                         setState(() {
@@ -1305,7 +1303,7 @@ class _MeasurementLabAdvancedSettingsPageState
                         });
                       }
                     },
-                    onSubmitted: (_) => _saveDownloadDuration(),
+                    onSubmitted: _saveDownloadDuration,
                   ),
                   SizedBox(height: tokens.spacing.regular),
                   Align(
@@ -1329,14 +1327,11 @@ class _MeasurementLabAdvancedSettingsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
+                  AppNumericBox(
                     controller: _uploadDurationController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Upload duration (seconds)',
-                      hintText: '10',
-                      errorText: _uploadDurationError,
-                    ),
+                    label: 'Upload duration (seconds)',
+                    hintText: '10',
+                    errorText: _uploadDurationError,
                     onChanged: (_) {
                       if (_uploadDurationError != null) {
                         setState(() {
@@ -1344,7 +1339,7 @@ class _MeasurementLabAdvancedSettingsPageState
                         });
                       }
                     },
-                    onSubmitted: (_) => _saveUploadDuration(),
+                    onSubmitted: _saveUploadDuration,
                   ),
                   SizedBox(height: tokens.spacing.regular),
                   Align(
@@ -1369,14 +1364,11 @@ class _MeasurementLabAdvancedSettingsPageState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextField(
+                  AppNumericBox(
                     controller: _latencySampleCountController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'RTT samples',
-                      hintText: '10',
-                      errorText: _latencySampleCountError,
-                    ),
+                    label: 'RTT samples',
+                    hintText: '10',
+                    errorText: _latencySampleCountError,
                     onChanged: (_) {
                       if (_latencySampleCountError != null) {
                         setState(() {
@@ -1384,7 +1376,7 @@ class _MeasurementLabAdvancedSettingsPageState
                         });
                       }
                     },
-                    onSubmitted: (_) => _saveLatencySampleCount(),
+                    onSubmitted: _saveLatencySampleCount,
                   ),
                   SizedBox(height: tokens.spacing.regular),
                   Align(

@@ -34,6 +34,7 @@ ThemeData _buildMaterialTheme({
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    fontFamily: 'Roboto',
     colorScheme: colorScheme,
     scaffoldBackgroundColor: scaffoldColor,
     appBarTheme: AppBarTheme(
@@ -128,6 +129,7 @@ ThemeData _buildIosTheme({
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    fontFamily: 'Roboto',
     cupertinoOverrideTheme: CupertinoThemeData(
       primaryColor: baseColor,
       brightness: brightness,

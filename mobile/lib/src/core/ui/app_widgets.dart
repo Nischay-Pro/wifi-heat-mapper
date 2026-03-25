@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 
@@ -214,7 +215,6 @@ class AppSettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
 
     final group = Column(
       children: [
@@ -231,13 +231,7 @@ class AppSettingsGroup extends StatelessWidget {
     );
 
     if (flat) {
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(tokens.radiusLarge),
-        ),
-        child: group,
-      );
+      return group;
     }
 
     return AppPanel(
@@ -254,13 +248,12 @@ class AppSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Text(
       label,
       style: textTheme.labelLarge?.copyWith(
-        color: colorScheme.onSurfaceVariant,
+        color: Theme.of(context).colorScheme.primary,
       ),
     );
   }
@@ -288,13 +281,13 @@ class AppSectionNote extends StatelessWidget {
 class AppSettingsRow extends StatelessWidget {
   const AppSettingsRow({
     super.key,
-    required this.icon,
     required this.title,
+    this.icon,
     this.subtitle,
     this.onTap,
   });
 
-  final IconData icon;
+  final IconData? icon;
   final String title;
   final String? subtitle;
   final VoidCallback? onTap;
@@ -307,16 +300,82 @@ class AppSettingsRow extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
-      leading: Icon(
-        icon,
-        color: colorScheme.primary,
-        size: tokens.iconMedium + 2,
-      ),
+      contentPadding: EdgeInsets.zero,
+      minLeadingWidth: icon == null ? 0 : null,
+      leading: icon == null
+          ? null
+          : Icon(
+              icon,
+              color: colorScheme.primary,
+              size: tokens.iconMedium + 2,
+            ),
       title: Text(title, style: textTheme.titleMedium),
       subtitle: subtitle == null
           ? null
           : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
+    );
+  }
+}
+
+class AppNumericBox extends StatelessWidget {
+  const AppNumericBox({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.hintText,
+    this.errorText,
+    this.onChanged,
+    this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hintText;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(24);
+
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.done,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        errorText: errorText,
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest,
+        border: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: colorScheme.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: BorderSide(color: colorScheme.error, width: 2),
+        ),
+      ),
+      onChanged: onChanged,
+      onSubmitted: (_) => onSubmitted?.call(),
+      onEditingComplete: onSubmitted,
     );
   }
 }
