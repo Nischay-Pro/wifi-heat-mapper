@@ -12,8 +12,10 @@ import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_service.dart';
+import 'package:mobile/src/features/measurements/local_measurement_service.dart';
 import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/floor_map.dart';
+import 'package:mobile/src/models/internet_measurement_result.dart';
 import 'package:mobile/src/models/site_detail.dart';
 import 'package:mobile/src/models/site_point.dart';
 import 'package:mobile/src/models/wifi_metadata.dart';
@@ -38,6 +40,10 @@ class MeasurementsPage extends ConsumerStatefulWidget {
 
 class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     with WidgetsBindingObserver {
+  static const double _localMeasurementWeight = 0.3;
+  static const double _internetMeasurementWeight = 0.6;
+  static const double _uploadWeight = 0.1;
+
   WifiMetadata _wifiMetadata = const WifiMetadata();
   SiteDetail? _siteDetail;
   FloorMap? _selectedFloorMap;
@@ -432,13 +438,58 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       _internetProgress = _internetProgress.mergeWith(
         const InternetSpeedTestProgress(
           phase: InternetSpeedTestPhase.measuringLatency,
-          overallProgress: 0.05,
+          overallProgress: 0,
           progress: 0,
         ),
       );
     });
 
     try {
+      InternetMeasurementResult? localResult;
+      String? localMeasurementNotice;
+      try {
+        localResult = await ref
+            .read(localMeasurementTestProvider)
+            .recordLocalMeasurement(
+              bindAddress: _wifiMetadata.clientIp,
+              onProgress: (progress, activeStageLabel) {
+                if (!mounted) {
+                  return;
+                }
+
+                setState(() {
+                  _displayedOverallProgress = max(
+                    _displayedOverallProgress,
+                    progress.clamp(0.0, 1.0) * _localMeasurementWeight,
+                  );
+                  _internetProgress = _internetProgress.mergeWith(
+                    InternetSpeedTestProgress(
+                      phase: InternetSpeedTestPhase.measuringLatency,
+                      overallProgress: _displayedOverallProgress,
+                      progress: progress.clamp(0.0, 1.0),
+                      activeStageLabel: activeStageLabel,
+                    ),
+                  );
+                });
+              },
+            );
+      } on StateError catch (error) {
+        localMeasurementNotice = _formatLocalMeasurementNotice(error.message);
+      } on SocketException catch (error) {
+        localMeasurementNotice = _formatLocalMeasurementNotice(error.message);
+      } catch (error) {
+        localMeasurementNotice = _formatLocalMeasurementNotice('$error');
+      }
+
+      if (mounted) {
+        setState(() {
+          _displayedOverallProgress = max(
+            _displayedOverallProgress,
+            _localMeasurementWeight,
+          );
+        });
+      }
+
       final result = await ref
           .read(internetSpeedTestServiceProvider)
           .recordInternetMeasurement(
@@ -451,7 +502,8 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
                 _internetProgress = _internetProgress.mergeWith(progress);
                 _displayedOverallProgress = max(
                   _displayedOverallProgress,
-                  progress.overallProgress,
+                  _localMeasurementWeight +
+                      (progress.overallProgress * _internetMeasurementWeight),
                 );
               });
             },
@@ -469,13 +521,23 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _completedPointIds = {..._completedPointIds, measurementPoint.id};
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
-          _measurementSubmissionMessage =
-              AppMessages.measurementCapturedNoServer;
+          _measurementSubmissionMessage = localMeasurementNotice == null
+              ? AppMessages.measurementCapturedNoServer
+              : '${AppMessages.measurementCapturedNoServer} $localMeasurementNotice';
         });
         return;
       }
 
       try {
+        if (mounted) {
+          setState(() {
+            _displayedOverallProgress = max(
+              _displayedOverallProgress,
+              1 - _uploadWeight,
+            );
+          });
+        }
+
         final deviceIdentity = await ref
             .read(deviceIdentityServiceProvider)
             .loadIdentity(ref.read(appPreferencesProvider));
@@ -487,6 +549,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               siteSlug: widget.selectedSiteSlug,
               device: deviceIdentity,
               wifiMetadata: _wifiMetadata,
+              localResult: localResult,
               internetResult: result,
               measuredAt: measuredAt,
               point: measurementPoint,
@@ -500,7 +563,9 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _completedPointIds = {..._completedPointIds, measurementPoint.id};
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
-          _measurementSubmissionMessage = AppMessages.measurementUploaded;
+          _measurementSubmissionMessage = localMeasurementNotice == null
+              ? AppMessages.measurementUploaded
+              : '${AppMessages.measurementUploaded} $localMeasurementNotice';
         });
         return;
       } on ApiException catch (error) {
@@ -598,6 +663,20 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         _isRecordingMeasurement = false;
       });
     }
+  }
+
+  String _formatLocalMeasurementNotice(String message) {
+    final trimmed = message.trim();
+    if (trimmed.isEmpty) {
+      return 'Intranet measurement skipped.';
+    }
+
+    if (trimmed.startsWith('Intranet measurement')) {
+      return trimmed;
+    }
+
+    final normalized = trimmed.endsWith('.') ? trimmed : '$trimmed.';
+    return 'Intranet measurement skipped: $normalized';
   }
 
   @override
@@ -852,7 +931,9 @@ class MeasurementsView extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: canRecordMeasurement ? onRecordMeasurement : null,
+                    onPressed: canRecordMeasurement
+                        ? onRecordMeasurement
+                        : null,
                     child: isRecordingMeasurement
                         ? const LoadingIndicator.small()
                         : const Text('Record measurement'),
@@ -874,7 +955,6 @@ class MeasurementsView extends StatelessWidget {
       body: SafeArea(child: content),
     );
   }
-
 }
 
 class _MeasurementHeader extends StatelessWidget {
@@ -1231,10 +1311,11 @@ class _FloorplanPointDot extends StatelessWidget {
               boxShadow: isSelected || isCompleted
                   ? [
                       BoxShadow(
-                        color: (isCompleted
-                                ? const Color(0xFF2E7D32)
-                                : colorScheme.primary)
-                            .withValues(alpha: 0.32),
+                        color:
+                            (isCompleted
+                                    ? const Color(0xFF2E7D32)
+                                    : colorScheme.primary)
+                                .withValues(alpha: 0.32),
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),

@@ -240,7 +240,9 @@ class InternetSpeedTestSettingsController
     }
 
     await _preferences.setHttpDownloadStageBytes(ordered);
-    state = state.copyWith(http: state.http.copyWith(downloadStageBytes: ordered));
+    state = state.copyWith(
+      http: state.http.copyWith(downloadStageBytes: ordered),
+    );
   }
 
   Future<void> setHttpUploadStageEnabled(int bytes, bool enabled) async {
@@ -260,14 +262,14 @@ class InternetSpeedTestSettingsController
     }
 
     await _preferences.setHttpUploadStageBytes(ordered);
-    state = state.copyWith(http: state.http.copyWith(uploadStageBytes: ordered));
+    state = state.copyWith(
+      http: state.http.copyWith(uploadStageBytes: ordered),
+    );
   }
 
   Future<void> setHttpParallelStreams(int value) async {
     await _preferences.setHttpParallelStreams(value);
-    state = state.copyWith(
-      http: state.http.copyWith(parallelStreams: value),
-    );
+    state = state.copyWith(http: state.http.copyWith(parallelStreams: value));
   }
 
   Future<void> setHttpLatencySampleCount(int value) async {

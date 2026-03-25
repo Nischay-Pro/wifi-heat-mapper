@@ -11,12 +11,14 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 import java.net.NetworkInterface
 import java.net.SocketException
 import kotlin.math.roundToInt
 
 class MainActivity : FlutterActivity() {
     private val wifiMetadataChannelName = "wifi_metadata"
+    private val iperfChannelName = "iperf_native"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -30,6 +32,31 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            iperfChannelName,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "prepareExecutable" -> {
+                    try {
+                        result.success(prepareIperfExecutable())
+                    } catch (error: Throwable) {
+                        result.error("iperf_prepare_failed", error.message, null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun prepareIperfExecutable(): String {
+        val source = File(applicationInfo.nativeLibraryDir, "libiperf_bundle.so")
+        require(source.exists()) {
+            "Bundled iperf binary is missing from nativeLibraryDir. " +
+                "Check android:extractNativeLibs/useLegacyPackaging."
+        }
+        return source.absolutePath
     }
 
     private fun loadWifiMetadata(): Map<String, Any?> {

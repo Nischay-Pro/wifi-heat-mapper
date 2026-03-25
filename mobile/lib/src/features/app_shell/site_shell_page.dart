@@ -10,6 +10,7 @@ import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
+import 'package:mobile/src/features/measurements/local_measurement_settings_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
@@ -362,6 +363,9 @@ class _SettingsTab extends ConsumerWidget {
     final internetSettings = ref.watch(
       internetSpeedTestSettingsControllerProvider,
     );
+    final intranetSettings = ref.watch(
+      localMeasurementSettingsControllerProvider,
+    );
 
     return AppPage(
       children: [
@@ -398,6 +402,17 @@ class _SettingsTab extends ConsumerWidget {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const _InternetSettingsPage(),
+                  ),
+                );
+              },
+            ),
+            AppSettingsRow(
+              title: 'Intranet speed test',
+              subtitle: intranetSettings.serverLabel,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const _IntranetSettingsPage(),
                   ),
                 );
               },
@@ -476,7 +491,9 @@ class _InternetSettingsPage extends ConsumerWidget {
                       settings.backend ==
                       InternetSpeedTestBackendPreference.publicLibrespeed,
                   onSelect: () => ref
-                      .read(internetSpeedTestSettingsControllerProvider.notifier)
+                      .read(
+                        internetSpeedTestSettingsControllerProvider.notifier,
+                      )
                       .setBackend(
                         InternetSpeedTestBackendPreference.publicLibrespeed,
                       ),
@@ -487,8 +504,8 @@ class _InternetSettingsPage extends ConsumerWidget {
                           title: 'Public Librespeed',
                           subtitle:
                               'Use the shared Librespeed public backend and adjust how the test runs.',
-                          backend:
-                              InternetSpeedTestBackendPreference.publicLibrespeed,
+                          backend: InternetSpeedTestBackendPreference
+                              .publicLibrespeed,
                         ),
                       ),
                     );
@@ -511,7 +528,9 @@ class _InternetSettingsPage extends ConsumerWidget {
                       settings.backend ==
                       InternetSpeedTestBackendPreference.customLibrespeed,
                   onSelect: () => ref
-                      .read(internetSpeedTestSettingsControllerProvider.notifier)
+                      .read(
+                        internetSpeedTestSettingsControllerProvider.notifier,
+                      )
                       .setBackend(
                         InternetSpeedTestBackendPreference.customLibrespeed,
                       ),
@@ -540,7 +559,9 @@ class _InternetSettingsPage extends ConsumerWidget {
                       settings.backend ==
                       InternetSpeedTestBackendPreference.cloudflare,
                   onSelect: () => ref
-                      .read(internetSpeedTestSettingsControllerProvider.notifier)
+                      .read(
+                        internetSpeedTestSettingsControllerProvider.notifier,
+                      )
                       .setBackend(
                         InternetSpeedTestBackendPreference.cloudflare,
                       ),
@@ -575,7 +596,9 @@ class _InternetSettingsPage extends ConsumerWidget {
                       settings.backend ==
                       InternetSpeedTestBackendPreference.measurementLab,
                   onSelect: () => ref
-                      .read(internetSpeedTestSettingsControllerProvider.notifier)
+                      .read(
+                        internetSpeedTestSettingsControllerProvider.notifier,
+                      )
                       .setBackend(
                         InternetSpeedTestBackendPreference.measurementLab,
                       ),
@@ -621,7 +644,8 @@ class _UiSettingsPage extends ConsumerWidget {
             const AppSectionLabel(label: 'User Interface'),
             SizedBox(height: tokens.spacing.compact),
             const AppSectionNote(
-              message: 'Choose how the app decides between light and dark mode.',
+              message:
+                  'Choose how the app decides between light and dark mode.',
             ),
             SizedBox(height: tokens.sectionGap),
             AppSettingsGroup(
@@ -649,6 +673,236 @@ class _UiSettingsPage extends ConsumerWidget {
                       themeController.setPreference(AppThemePreference.dark),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IntranetSettingsPage extends ConsumerStatefulWidget {
+  const _IntranetSettingsPage();
+
+  @override
+  ConsumerState<_IntranetSettingsPage> createState() =>
+      _IntranetSettingsPageState();
+}
+
+class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
+  late final TextEditingController _hostController;
+  late final TextEditingController _portController;
+  String? _errorMessage;
+  String? _statusMessage;
+  bool _isTestingConnection = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = ref.read(localMeasurementSettingsControllerProvider);
+    _hostController = TextEditingController(text: settings.serverHost ?? '');
+    _portController = TextEditingController(
+      text: settings.serverPort.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _hostController.dispose();
+    _portController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final host = _hostController.text.trim();
+    final port = int.tryParse(_portController.text.trim());
+    if (host.isEmpty || port == null || port < 1 || port > 65535) {
+      setState(() {
+        _errorMessage = AppMessages.intranetServerRequired;
+      });
+      return;
+    }
+
+    await ref
+        .read(localMeasurementSettingsControllerProvider.notifier)
+        .saveServer(host: host, port: port);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _statusMessage = 'Saved intranet iperf3 server.';
+    });
+  }
+
+  Future<void> _testConnection() async {
+    final host = _hostController.text.trim();
+    final port = int.tryParse(_portController.text.trim());
+    if (host.isEmpty || port == null || port < 1 || port > 65535) {
+      setState(() {
+        _errorMessage = AppMessages.intranetServerRequired;
+        _statusMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isTestingConnection = true;
+      _errorMessage = null;
+      _statusMessage = null;
+    });
+
+    final connected = await ref
+        .read(localMeasurementSettingsControllerProvider.notifier)
+        .testServerConnection(host: host, port: port);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isTestingConnection = false;
+      _statusMessage = connected
+          ? 'Connected to intranet iperf3 server.'
+          : AppMessages.intranetServerConnectionFailed;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = AppTokens.of(context);
+    final settings = ref.watch(localMeasurementSettingsControllerProvider);
+    final controller = ref.read(
+      localMeasurementSettingsControllerProvider.notifier,
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Intranet speed test')),
+      body: SafeArea(
+        child: AppPage(
+          children: [
+            const AppSectionLabel(label: 'iPerf3'),
+            SizedBox(height: tokens.spacing.compact),
+            const AppSectionNote(
+              message:
+                  'Configure the intranet iperf3 server used for LAN throughput measurements.',
+            ),
+            SizedBox(height: tokens.sectionGap),
+            AppPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _hostController,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: InputDecoration(
+                      labelText: 'Server host or IP',
+                      hintText: '192.168.1.100',
+                      errorText: _errorMessage,
+                    ),
+                    onChanged: (_) {
+                      if (_errorMessage != null) {
+                        setState(() {
+                          _errorMessage = null;
+                        });
+                      }
+                    },
+                  ),
+                  SizedBox(height: tokens.spacing.regular),
+                  AppNumericBox(
+                    controller: _portController,
+                    label: 'Port',
+                    hintText: '5201',
+                    onChanged: (_) {
+                      if (_errorMessage != null || _statusMessage != null) {
+                        setState(() {
+                          _errorMessage = null;
+                          _statusMessage = null;
+                        });
+                      }
+                    },
+                  ),
+                  if (_statusMessage != null) ...[
+                    SizedBox(height: tokens.spacing.regular),
+                    Text(
+                      _statusMessage!,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                  SizedBox(height: tokens.spacing.regular),
+                  Wrap(
+                    spacing: tokens.spacing.compact,
+                    runSpacing: tokens.spacing.compact,
+                    children: [
+                      FilledButton(
+                        onPressed: _save,
+                        child: const Text('Save intranet server'),
+                      ),
+                      OutlinedButton(
+                        onPressed: _isTestingConnection
+                            ? null
+                            : _testConnection,
+                        child: Text(
+                          _isTestingConnection
+                              ? 'Testing...'
+                              : 'Test connection',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: tokens.sectionGap),
+            AppPanel(
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('TCP download'),
+                    value: settings.modes.tcpDownloadEnabled,
+                    onChanged: controller.setTcpDownloadEnabled,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('TCP upload'),
+                    value: settings.modes.tcpUploadEnabled,
+                    onChanged: controller.setTcpUploadEnabled,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('UDP download'),
+                    value: settings.modes.udpDownloadEnabled,
+                    onChanged: controller.setUdpDownloadEnabled,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('UDP upload'),
+                    value: settings.modes.udpUploadEnabled,
+                    onChanged: controller.setUdpUploadEnabled,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: tokens.sectionGap),
+            AppSettingsGroup(
+              flat: true,
+              children: [
+                AppSettingsRow(
+                  title: 'Enabled iperf modes',
+                  subtitle: settings.modes.summary,
+                ),
+              ],
+            ),
+            SizedBox(height: tokens.sectionGap),
+            const AppBanner(
+              icon: Icons.info_outline_rounded,
+              message:
+                  'Intranet measurements map to WHM local_result. The current mobile app still needs a native iperf3 client bridge before these measurements can run.',
             ),
           ],
         ),
@@ -976,8 +1230,8 @@ class _HttpBackendAdvancedSettingsPageState
       _parallelStreamsError = null;
       _latencySampleCountError = null;
       _parallelStreamsController.text = defaults.parallelStreams.toString();
-      _latencySampleCountController.text =
-          defaults.latencySampleCount.toString();
+      _latencySampleCountController.text = defaults.latencySampleCount
+          .toString();
     });
   }
 
@@ -992,12 +1246,7 @@ class _HttpBackendAdvancedSettingsPageState
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        actions: [
-          TextButton(
-            onPressed: _reset,
-            child: const Text('Reset'),
-          ),
-        ],
+        actions: [TextButton(onPressed: _reset, child: const Text('Reset'))],
       ),
       body: SafeArea(
         child: AppPage(
@@ -1171,8 +1420,7 @@ class _MeasurementLabAdvancedSettingsPageState
     final parsed = int.tryParse(_downloadDurationController.text.trim());
     if (parsed == null || parsed <= 0) {
       setState(() {
-        _downloadDurationError =
-            'Enter a valid positive number of seconds.';
+        _downloadDurationError = 'Enter a valid positive number of seconds.';
       });
       return;
     }
@@ -1248,12 +1496,12 @@ class _MeasurementLabAdvancedSettingsPageState
       _downloadDurationError = null;
       _uploadDurationError = null;
       _latencySampleCountError = null;
-      _downloadDurationController.text =
-          defaults.downloadDurationSeconds.toString();
-      _uploadDurationController.text =
-          defaults.uploadDurationSeconds.toString();
-      _latencySampleCountController.text =
-          defaults.latencySampleCount.toString();
+      _downloadDurationController.text = defaults.downloadDurationSeconds
+          .toString();
+      _uploadDurationController.text = defaults.uploadDurationSeconds
+          .toString();
+      _latencySampleCountController.text = defaults.latencySampleCount
+          .toString();
     });
   }
 
@@ -1264,12 +1512,7 @@ class _MeasurementLabAdvancedSettingsPageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Measurement Lab'),
-        actions: [
-          TextButton(
-            onPressed: _reset,
-            child: const Text('Reset'),
-          ),
-        ],
+        actions: [TextButton(onPressed: _reset, child: const Text('Reset'))],
       ),
       body: SafeArea(
         child: AppPage(
@@ -1590,14 +1833,14 @@ class _BackendSettingsRow extends StatelessWidget {
     required this.isSelected,
     required this.onSelect,
     required this.onTap,
-    required this.onOpenAdvanced,
+    this.onOpenAdvanced,
   });
 
   final String title;
   final bool isSelected;
   final VoidCallback onSelect;
   final VoidCallback onTap;
-  final VoidCallback onOpenAdvanced;
+  final VoidCallback? onOpenAdvanced;
 
   @override
   Widget build(BuildContext context) {
@@ -1623,7 +1866,9 @@ class _BackendSettingsRow extends StatelessWidget {
                 bottom: tokens.spacing.compact / 2,
               ),
               child: Icon(
-                isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
                 color: isSelected ? colorScheme.primary : colorScheme.outline,
                 size: tokens.iconMedium + 2,
               ),
@@ -1642,7 +1887,9 @@ class _BackendSettingsRow extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Expanded(child: Text(title, style: textTheme.titleMedium)),
+                      Expanded(
+                        child: Text(title, style: textTheme.titleMedium),
+                      ),
                       SizedBox(width: tokens.spacing.compact),
                       Icon(
                         Icons.chevron_right_rounded,
@@ -1654,21 +1901,19 @@ class _BackendSettingsRow extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(width: tokens.spacing.compact),
-          Container(
-            width: 1,
-            height: 24,
-            color: colorScheme.outlineVariant,
-          ),
-          SizedBox(width: tokens.spacing.compact / 2),
-          IconButton(
-            onPressed: onOpenAdvanced,
-            tooltip: 'Advanced options',
-            icon: Icon(Icons.settings_outlined, color: colorScheme.outline),
-            splashRadius: 18,
-            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
-            padding: EdgeInsets.zero,
-          ),
+          if (onOpenAdvanced != null) ...[
+            SizedBox(width: tokens.spacing.compact),
+            Container(width: 1, height: 24, color: colorScheme.outlineVariant),
+            SizedBox(width: tokens.spacing.compact / 2),
+            IconButton(
+              onPressed: onOpenAdvanced,
+              tooltip: 'Advanced options',
+              icon: Icon(Icons.settings_outlined, color: colorScheme.outline),
+              splashRadius: 18,
+              constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+              padding: EdgeInsets.zero,
+            ),
+          ],
         ],
       ),
     );

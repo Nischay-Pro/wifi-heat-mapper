@@ -1,0 +1,3 @@
+[submodule "mobile/external/iperf"]
+	path = mobile/external/iperf
+	url = https://github.com/esnet/iperf

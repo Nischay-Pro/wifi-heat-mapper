@@ -76,7 +76,7 @@
 								<pre>{JSON.stringify(measurement.wifi, null, 2)}</pre>
 							</section>
 							<section>
-								<h3>Local</h3>
+								<h3>Intranet</h3>
 								<pre>{JSON.stringify(measurement.local_result, null, 2)}</pre>
 							</section>
 							<section>

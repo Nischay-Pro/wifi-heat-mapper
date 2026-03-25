@@ -10,49 +10,32 @@ import 'package:mobile/src/features/measurements/internet_speed_test_settings_co
 import 'package:mobile/src/models/internet_measurement_result.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
 
-final internetSpeedTestServiceProvider = Provider<InternetSpeedTestService>((
-  ref,
-) {
+final internetSpeedTestServiceProvider = Provider<MeasurementTest>((ref) {
   final settings = ref.watch(internetSpeedTestSettingsControllerProvider);
+  final engine = InternetSpeedTestEngine(
+    httpSettings: settings.http,
+    measurementLabSettings: settings.measurementLab,
+  );
 
   switch (settings.backend) {
     case InternetSpeedTestBackendPreference.publicLibrespeed:
-      return InternetSpeedTestService._backend(
-        _BackendConfig.publicLibrespeed(),
-        httpSettings: settings.http,
-        measurementLabSettings: settings.measurementLab,
-      );
+      return PublicLibrespeedMeasurementTest(engine);
     case InternetSpeedTestBackendPreference.customLibrespeed:
       final customUrl = settings.customLibrespeedUrl;
       final customBaseUri = customUrl == null
           ? null
           : _normalizedCustomLibrespeedBaseUri(customUrl);
       if (customBaseUri == null) {
-        return const InternetSpeedTestService.unavailable(
+        return const UnavailableMeasurementTest(
           AppMessages.customLibrespeedUrlRequired,
         );
       }
 
-      return InternetSpeedTestService._backend(
-        _BackendConfig.librespeed(
-          backendName: 'custom_librespeed',
-          baseUri: customBaseUri.toString(),
-        ),
-        httpSettings: settings.http,
-        measurementLabSettings: settings.measurementLab,
-      );
+      return CustomLibrespeedMeasurementTest(engine, customBaseUri.toString());
     case InternetSpeedTestBackendPreference.cloudflare:
-      return InternetSpeedTestService._backend(
-        const _BackendConfig.cloudflare(),
-        httpSettings: settings.http,
-        measurementLabSettings: settings.measurementLab,
-      );
+      return CloudflareMeasurementTest(engine);
     case InternetSpeedTestBackendPreference.measurementLab:
-      return InternetSpeedTestService._backend(
-        const _BackendConfig.measurementLab(),
-        httpSettings: settings.http,
-        measurementLabSettings: settings.measurementLab,
-      );
+      return MeasurementLabMeasurementTest(engine);
   }
 });
 
@@ -123,31 +106,99 @@ class InternetSpeedTestProgress {
 typedef InternetSpeedTestProgressCallback =
     void Function(InternetSpeedTestProgress progress);
 
-class InternetSpeedTestService {
-  const InternetSpeedTestService._backend(
-    this._backendConfig, {
+abstract class MeasurementTest {
+  const MeasurementTest();
+
+  Future<InternetMeasurementResult> recordInternetMeasurement({
+    required InternetSpeedTestProgressCallback onProgress,
+  });
+}
+
+class UnavailableMeasurementTest extends MeasurementTest {
+  const UnavailableMeasurementTest(this.message);
+
+  final String message;
+
+  @override
+  Future<InternetMeasurementResult> recordInternetMeasurement({
+    required InternetSpeedTestProgressCallback onProgress,
+  }) {
+    throw StateError(message);
+  }
+}
+
+class PublicLibrespeedMeasurementTest extends MeasurementTest {
+  const PublicLibrespeedMeasurementTest(this.engine);
+
+  final InternetSpeedTestEngine engine;
+
+  @override
+  Future<InternetMeasurementResult> recordInternetMeasurement({
+    required InternetSpeedTestProgressCallback onProgress,
+  }) {
+    return engine.recordConfiguredMeasurement(
+      backend: const BackendConfig.publicLibrespeed(),
+      onProgress: onProgress,
+    );
+  }
+}
+
+class CustomLibrespeedMeasurementTest extends MeasurementTest {
+  const CustomLibrespeedMeasurementTest(this.engine, this.baseUri);
+
+  final InternetSpeedTestEngine engine;
+  final String baseUri;
+
+  @override
+  Future<InternetMeasurementResult> recordInternetMeasurement({
+    required InternetSpeedTestProgressCallback onProgress,
+  }) {
+    return engine.recordConfiguredMeasurement(
+      backend: BackendConfig.librespeed(
+        backendName: 'custom_librespeed',
+        baseUri: baseUri,
+      ),
+      onProgress: onProgress,
+    );
+  }
+}
+
+class CloudflareMeasurementTest extends MeasurementTest {
+  const CloudflareMeasurementTest(this.engine);
+
+  final InternetSpeedTestEngine engine;
+
+  @override
+  Future<InternetMeasurementResult> recordInternetMeasurement({
+    required InternetSpeedTestProgressCallback onProgress,
+  }) {
+    return engine.recordConfiguredMeasurement(
+      backend: const BackendConfig.cloudflare(),
+      onProgress: onProgress,
+    );
+  }
+}
+
+class MeasurementLabMeasurementTest extends MeasurementTest {
+  const MeasurementLabMeasurementTest(this.engine);
+
+  final InternetSpeedTestEngine engine;
+
+  @override
+  Future<InternetMeasurementResult> recordInternetMeasurement({
+    required InternetSpeedTestProgressCallback onProgress,
+  }) {
+    return engine.recordMeasurementLab(onProgress: onProgress);
+  }
+}
+
+class InternetSpeedTestEngine {
+  const InternetSpeedTestEngine({
     required HttpInternetSpeedTestAdvancedSettings httpSettings,
     required MeasurementLabAdvancedSettings measurementLabSettings,
-  }) : unavailableMessage = null,
-       _httpSettings = httpSettings,
+  }) : _httpSettings = httpSettings,
        _measurementLabSettings = measurementLabSettings;
 
-  const InternetSpeedTestService.unavailable(this.unavailableMessage)
-    : _backendConfig = null,
-      _httpSettings = const HttpInternetSpeedTestAdvancedSettings(
-        downloadStageBytes: [100 * 1000],
-        uploadStageBytes: [100 * 1000],
-        parallelStreams: 1,
-        latencySampleCount: 10,
-      ),
-      _measurementLabSettings = const MeasurementLabAdvancedSettings(
-        downloadDurationSeconds: 15,
-        uploadDurationSeconds: 10,
-        latencySampleCount: 10,
-      );
-
-  final _BackendConfig? _backendConfig;
-  final String? unavailableMessage;
   final HttpInternetSpeedTestAdvancedSettings _httpSettings;
   final MeasurementLabAdvancedSettings _measurementLabSettings;
 
@@ -185,18 +236,10 @@ class InternetSpeedTestService {
   int get _idleLatencySampleCount => _httpSettings.latencySampleCount;
   int get _streamCount => _httpSettings.parallelStreams;
 
-  Future<InternetMeasurementResult> recordInternetMeasurement({
+  Future<InternetMeasurementResult> recordConfiguredMeasurement({
+    required BackendConfig backend,
     required InternetSpeedTestProgressCallback onProgress,
   }) async {
-    if (unavailableMessage != null) {
-      throw StateError(unavailableMessage!);
-    }
-
-    final backend = _backendConfig!;
-    if (backend.kind == _BackendKind.measurementLab) {
-      return _recordMeasurementLab(onProgress: onProgress);
-    }
-
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 15);
 
@@ -309,7 +352,7 @@ class InternetSpeedTestService {
     }
   }
 
-  Future<InternetMeasurementResult> _recordMeasurementLab({
+  Future<InternetMeasurementResult> recordMeasurementLab({
     required InternetSpeedTestProgressCallback onProgress,
   }) async {
     final downloadDuration = Duration(
@@ -513,7 +556,8 @@ class InternetSpeedTestService {
 
             if (phase == InternetSpeedTestPhase.testingUpload) {
               final acknowledgedBytes = _extractMeasurementLabAckedBytes(event);
-              if (acknowledgedBytes != null && acknowledgedBytes > bytesTransferred) {
+              if (acknowledgedBytes != null &&
+                  acknowledgedBytes > bytesTransferred) {
                 bytesTransferred = acknowledgedBytes;
               }
             }
@@ -599,10 +643,7 @@ class InternetSpeedTestService {
         );
       }
 
-      await Future.wait<void>([
-        phaseDone.future,
-        ?uploadLoop,
-      ]);
+      await Future.wait<void>([phaseDone.future, ?uploadLoop]);
 
       final phaseSamples = sampler.finish(
         totalBytes: bytesTransferred,
@@ -1085,10 +1126,10 @@ class InternetSpeedTestService {
 
   Future<_ResolvedBackend> _resolveBackend(
     HttpClient client,
-    _BackendConfig backend,
+    BackendConfig backend,
   ) async {
     switch (backend.kind) {
-      case _BackendKind.cloudflare:
+      case BackendKind.cloudflare:
         return _ResolvedBackend(
           backendName: backend.backendName,
           downloadUriBuilder: (bytes) =>
@@ -1097,20 +1138,20 @@ class InternetSpeedTestService {
           latencyUriBuilder: () =>
               Uri.parse('${backend.baseUri}__down?bytes=1'),
         );
-      case _BackendKind.librespeed:
+      case BackendKind.librespeed:
         if (backend.usePublicServerList) {
           return _resolvePublicLibrespeedBackend(client, backend);
         }
 
         return _resolvedCustomLibrespeedBackend(backend);
-      case _BackendKind.measurementLab:
+      case BackendKind.measurementLab:
         throw UnsupportedError(AppMessages.measurementLabUnavailable);
     }
   }
 
   Future<_ResolvedBackend> _resolvePublicLibrespeedBackend(
     HttpClient client,
-    _BackendConfig backend,
+    BackendConfig backend,
   ) async {
     final serverListUri = Uri.parse(
       '${backend.baseUri}backend-servers/servers.php',
@@ -1221,7 +1262,7 @@ class InternetSpeedTestService {
     }
   }
 
-  _ResolvedBackend _resolvedCustomLibrespeedBackend(_BackendConfig backend) {
+  _ResolvedBackend _resolvedCustomLibrespeedBackend(BackendConfig backend) {
     final base = _normalizedEndpointBaseUri(backend.baseUri)!;
     final basePath = base.path.endsWith('/') ? base.path : '${base.path}/';
     final usesBackendRoot =
@@ -1247,34 +1288,28 @@ class InternetSpeedTestService {
   }
 }
 
-enum _BackendKind { cloudflare, librespeed, measurementLab }
+enum BackendKind { cloudflare, librespeed, measurementLab }
 
-class _BackendConfig {
-  const _BackendConfig.publicLibrespeed()
-    : kind = _BackendKind.librespeed,
+class BackendConfig {
+  const BackendConfig.publicLibrespeed()
+    : kind = BackendKind.librespeed,
       backendName = 'public_librespeed',
       baseUri = 'https://librespeed.org/',
       usePublicServerList = true;
 
-  const _BackendConfig.cloudflare()
-    : kind = _BackendKind.cloudflare,
+  const BackendConfig.cloudflare()
+    : kind = BackendKind.cloudflare,
       backendName = 'cloudflare',
       baseUri = 'https://speed.cloudflare.com/',
       usePublicServerList = false;
 
-  const _BackendConfig.librespeed({
+  const BackendConfig.librespeed({
     required this.backendName,
     required this.baseUri,
-  }) : kind = _BackendKind.librespeed,
+  }) : kind = BackendKind.librespeed,
        usePublicServerList = false;
 
-  const _BackendConfig.measurementLab()
-    : kind = _BackendKind.measurementLab,
-      backendName = 'measurement_lab',
-      baseUri = 'https://speed.measurementlab.net/',
-      usePublicServerList = false;
-
-  final _BackendKind kind;
+  final BackendKind kind;
   final String backendName;
   final String baseUri;
   final bool usePublicServerList;

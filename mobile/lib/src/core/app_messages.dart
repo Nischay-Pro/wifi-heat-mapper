@@ -33,6 +33,14 @@ class AppMessages {
       'Measurement captured locally, but no connected server URL is available for upload.';
   static const customLibrespeedUrlRequired =
       'Enter a valid http:// or https:// URL for your custom Librespeed server.';
+  static const intranetServerRequired =
+      'Enter a valid intranet iperf3 server host or IP address.';
+  static const intranetServerConnectionFailed =
+      'The configured intranet iperf3 server could not be reached.';
+  static const intranetUnavailable =
+      'The intranet iperf3 setting is configured, but this mobile app build does not include a native iperf3 client yet.';
+  static const intranetNoModesSelected =
+      'No intranet iperf3 modes are enabled.';
   static const measurementLabUnavailable =
       'Measurement Lab could not provide a test server right now. Try again later.';
 }

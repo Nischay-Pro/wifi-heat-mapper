@@ -50,6 +50,12 @@ class AppPreferences {
   static const themePreferenceKey = 'theme_preference';
   static const internetSpeedTestBackendKey = 'internet_speed_test_backend';
   static const customLibrespeedUrlKey = 'custom_librespeed_url';
+  static const iperfServerHostKey = 'iperf_server_host';
+  static const iperfServerPortKey = 'iperf_server_port';
+  static const iperfTcpDownloadEnabledKey = 'iperf_tcp_download_enabled';
+  static const iperfTcpUploadEnabledKey = 'iperf_tcp_upload_enabled';
+  static const iperfUdpDownloadEnabledKey = 'iperf_udp_download_enabled';
+  static const iperfUdpUploadEnabledKey = 'iperf_udp_upload_enabled';
   static const httpDownloadStageBytesKey = 'http_download_stage_bytes';
   static const httpUploadStageBytesKey = 'http_upload_stage_bytes';
   static const httpParallelStreamsKey = 'http_parallel_streams';
@@ -80,6 +86,22 @@ class AppPreferences {
 
   String? getCustomLibrespeedUrl() =>
       _preferences.getString(customLibrespeedUrlKey);
+
+  String? getIperfServerHost() => _preferences.getString(iperfServerHostKey);
+
+  int? getIperfServerPort() => _preferences.getInt(iperfServerPortKey);
+
+  bool? getIperfTcpDownloadEnabled() =>
+      _preferences.getBool(iperfTcpDownloadEnabledKey);
+
+  bool? getIperfTcpUploadEnabled() =>
+      _preferences.getBool(iperfTcpUploadEnabledKey);
+
+  bool? getIperfUdpDownloadEnabled() =>
+      _preferences.getBool(iperfUdpDownloadEnabledKey);
+
+  bool? getIperfUdpUploadEnabled() =>
+      _preferences.getBool(iperfUdpUploadEnabledKey);
 
   List<int>? getHttpDownloadStageBytes() =>
       _getIntList(httpDownloadStageBytesKey);
@@ -119,6 +141,24 @@ class AppPreferences {
   Future<bool> setCustomLibrespeedUrl(String value) =>
       _preferences.setString(customLibrespeedUrlKey, value);
 
+  Future<bool> setIperfServerHost(String value) =>
+      _preferences.setString(iperfServerHostKey, value);
+
+  Future<bool> setIperfServerPort(int value) =>
+      _preferences.setInt(iperfServerPortKey, value);
+
+  Future<bool> setIperfTcpDownloadEnabled(bool value) =>
+      _preferences.setBool(iperfTcpDownloadEnabledKey, value);
+
+  Future<bool> setIperfTcpUploadEnabled(bool value) =>
+      _preferences.setBool(iperfTcpUploadEnabledKey, value);
+
+  Future<bool> setIperfUdpDownloadEnabled(bool value) =>
+      _preferences.setBool(iperfUdpDownloadEnabledKey, value);
+
+  Future<bool> setIperfUdpUploadEnabled(bool value) =>
+      _preferences.setBool(iperfUdpUploadEnabledKey, value);
+
   Future<bool> setHttpDownloadStageBytes(List<int> values) =>
       _setIntList(httpDownloadStageBytesKey, values);
 
@@ -145,6 +185,9 @@ class AppPreferences {
 
   Future<bool> clearCustomLibrespeedUrl() =>
       _preferences.remove(customLibrespeedUrlKey);
+
+  Future<bool> clearIperfServerHost() =>
+      _preferences.remove(iperfServerHostKey);
 
   List<int>? _getIntList(String key) {
     final values = _preferences.getStringList(key);

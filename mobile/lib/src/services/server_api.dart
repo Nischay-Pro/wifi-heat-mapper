@@ -212,11 +212,15 @@ class ServerApi {
   }) async {
     final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
     final measurementsUri = baseUri.replace(
-      path: '${baseUri.path}/api/sites/$siteSlug/measurements'.replaceAll('//', '/'),
+      path: '${baseUri.path}/api/sites/$siteSlug/measurements'.replaceAll(
+        '//',
+        '/',
+      ),
       queryParameters: {'device_slug': deviceSlug},
     );
 
-    final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
+    final httpClient = HttpClient()
+      ..connectionTimeout = serverConnectionTimeout;
 
     try {
       final request = await httpClient
@@ -258,6 +262,7 @@ class ServerApi {
     required String siteSlug,
     required DeviceIdentity device,
     required WifiMetadata wifiMetadata,
+    required InternetMeasurementResult? localResult,
     required InternetMeasurementResult internetResult,
     required DateTime measuredAt,
     required SitePoint point,
@@ -281,7 +286,7 @@ class ServerApi {
       },
       'measured_at': measuredAt.toUtc().toIso8601String(),
       'wifi': wifiMetadata.toJson(),
-      'local_result': null,
+      'local_result': localResult?.toJson(),
       'internet_result': internetResult.toJson(),
     });
 
