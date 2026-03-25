@@ -205,6 +205,54 @@ class ServerApi {
     }
   }
 
+  Future<Set<String>> fetchMeasuredPointIds({
+    required String serverUrl,
+    required String siteSlug,
+    required String deviceSlug,
+  }) async {
+    final baseUri = Uri.parse(normalizeServerUrl(serverUrl));
+    final measurementsUri = baseUri.replace(
+      path: '${baseUri.path}/api/sites/$siteSlug/measurements'.replaceAll('//', '/'),
+      queryParameters: {'device_slug': deviceSlug},
+    );
+
+    final httpClient = HttpClient()..connectionTimeout = serverConnectionTimeout;
+
+    try {
+      final request = await httpClient
+          .getUrl(measurementsUri)
+          .timeout(serverConnectionTimeout);
+      final response = await request.close().timeout(serverConnectionTimeout);
+      final responseBody = await utf8.decodeStream(response);
+
+      if (response.statusCode != HttpStatus.ok) {
+        throw _parseApiException(
+          responseBody: responseBody,
+          statusCode: response.statusCode,
+          fallbackMessage:
+              'Server returned ${response.statusCode} for ${measurementsUri.path}',
+        );
+      }
+
+      final decoded = jsonDecode(responseBody) as Map<String, dynamic>;
+      final measurementsJson = decoded['measurements'];
+
+      if (measurementsJson is! List) {
+        throw const FormatException(
+          'Measurements payload is missing the measurements list.',
+        );
+      }
+
+      return measurementsJson
+          .map((measurement) => measurement as Map<String, dynamic>)
+          .map((measurement) => measurement['point_id'] as String?)
+          .whereType<String>()
+          .toSet();
+    } finally {
+      httpClient.close();
+    }
+  }
+
   Future<void> submitMeasurement({
     required String serverUrl,
     required String siteSlug,

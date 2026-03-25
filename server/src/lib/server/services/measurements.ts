@@ -1,7 +1,7 @@
 import type { ThroughputResult, WifiMetadata } from "$lib/server/db/schema";
 import { getDb } from "$lib/server/db/schema";
 
-export async function listMeasurements(limit = 100, siteId?: string) {
+export async function listMeasurements(limit = 100, siteId?: string, deviceSlug?: string) {
 	const db = getDb();
 
 	let query = db
@@ -41,6 +41,10 @@ export async function listMeasurements(limit = 100, siteId?: string) {
 
 	if (siteId) {
 		query = query.where("measurements.site_id", "=", siteId);
+	}
+
+	if (deviceSlug) {
+		query = query.where("devices.slug", "=", deviceSlug);
 	}
 
 	return query.execute();

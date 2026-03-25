@@ -14,7 +14,6 @@ import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_service.dart';
 import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/floor_map.dart';
-import 'package:mobile/src/models/internet_measurement_result.dart';
 import 'package:mobile/src/models/site_detail.dart';
 import 'package:mobile/src/models/site_point.dart';
 import 'package:mobile/src/models/wifi_metadata.dart';
@@ -43,12 +42,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
   SiteDetail? _siteDetail;
   FloorMap? _selectedFloorMap;
   SitePoint? _selectedPoint;
-  SitePoint? _lastRecordedPoint;
-  InternetMeasurementResult? _internetResult;
+  Set<String> _completedPointIds = <String>{};
+  String? _deviceSlug;
   bool _isLoading = true;
   bool _isRefreshing = false;
   bool _isRequestInFlight = false;
   bool _isSiteDetailRequestInFlight = false;
+  bool _isCompletedPointsRequestInFlight = false;
   bool _isLoadingSiteDetail = true;
   bool _isRecordingMeasurement = false;
   String? _errorMessage;
@@ -61,7 +61,6 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     progress: 0,
   );
   double _displayedOverallProgress = 0;
-  DateTime? _lastRecordedAt;
   Timer? _metadataPollTimer;
   Timer? _siteDetailPollTimer;
   String? _lastSnackbarMessage;
@@ -70,6 +69,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadDeviceIdentity();
     _loadMetadata(showLoading: true);
     _loadSiteDetail(showLoading: true);
     _startPolling();
@@ -82,15 +82,27 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       _siteDetail = null;
       _selectedFloorMap = null;
       _selectedPoint = null;
-      _lastRecordedPoint = null;
+      _completedPointIds = <String>{};
       _siteDetailError = null;
-      _internetResult = null;
       _internetMeasurementError = null;
       _measurementSubmissionMessage = null;
-      _lastRecordedAt = null;
       _displayedOverallProgress = 0;
       _loadSiteDetail(showLoading: true);
     }
+  }
+
+  Future<void> _loadDeviceIdentity() async {
+    final deviceIdentity = await ref
+        .read(deviceIdentityServiceProvider)
+        .loadIdentity(ref.read(appPreferencesProvider));
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _deviceSlug = deviceIdentity.slug;
+    });
+    await _loadCompletedPointIds();
   }
 
   @override
@@ -211,6 +223,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _measurementSubmissionMessage = null;
         }
       });
+      await _loadCompletedPointIds();
     } on ApiException catch (error) {
       if (!mounted) {
         return;
@@ -249,6 +262,45 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       });
     } finally {
       _isSiteDetailRequestInFlight = false;
+    }
+  }
+
+  Future<void> _loadCompletedPointIds() async {
+    if (_isCompletedPointsRequestInFlight) {
+      return;
+    }
+
+    final serverUrl = ref
+        .read(serverConnectionControllerProvider)
+        .connectedServerUrl;
+    final deviceSlug = _deviceSlug;
+    if (serverUrl == null ||
+        serverUrl.isEmpty ||
+        deviceSlug == null ||
+        deviceSlug.isEmpty) {
+      return;
+    }
+
+    _isCompletedPointsRequestInFlight = true;
+    try {
+      final completedPointIds = await ref
+          .read(serverApiProvider)
+          .fetchMeasuredPointIds(
+            serverUrl: serverUrl,
+            siteSlug: widget.selectedSiteSlug,
+            deviceSlug: deviceSlug,
+          );
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _completedPointIds = completedPointIds;
+      });
+    } catch (_) {
+      // Background refresh should stay silent on successful screen state.
+    } finally {
+      _isCompletedPointsRequestInFlight = false;
     }
   }
 
@@ -376,7 +428,6 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       _isRecordingMeasurement = true;
       _internetMeasurementError = null;
       _measurementSubmissionMessage = null;
-      _internetResult = null;
       _displayedOverallProgress = 0;
       _internetProgress = _internetProgress.mergeWith(
         const InternetSpeedTestProgress(
@@ -415,9 +466,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           .connectedServerUrl;
       if (serverUrl == null || serverUrl.isEmpty) {
         setState(() {
-          _internetResult = result;
-          _lastRecordedPoint = measurementPoint;
-          _lastRecordedAt = DateTime.now();
+          _completedPointIds = {..._completedPointIds, measurementPoint.id};
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
           _measurementSubmissionMessage =
@@ -448,9 +497,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         }
 
         setState(() {
-          _internetResult = result;
-          _lastRecordedPoint = measurementPoint;
-          _lastRecordedAt = measuredAt;
+          _completedPointIds = {..._completedPointIds, measurementPoint.id};
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
           _measurementSubmissionMessage = AppMessages.measurementUploaded;
@@ -467,9 +514,6 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         }
 
         setState(() {
-          _internetResult = result;
-          _lastRecordedPoint = null;
-          _lastRecordedAt = DateTime.now();
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
           _measurementSubmissionMessage = error.code == 'invalid_point'
@@ -483,9 +527,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         }
 
         setState(() {
-          _internetResult = result;
-          _lastRecordedPoint = measurementPoint;
-          _lastRecordedAt = DateTime.now();
+          _completedPointIds = {..._completedPointIds, measurementPoint.id};
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
           _measurementSubmissionMessage =
@@ -498,9 +540,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         }
 
         setState(() {
-          _internetResult = result;
-          _lastRecordedPoint = measurementPoint;
-          _lastRecordedAt = DateTime.now();
+          _completedPointIds = {..._completedPointIds, measurementPoint.id};
           _displayedOverallProgress = 1;
           _isRecordingMeasurement = false;
           _measurementSubmissionMessage =
@@ -573,8 +613,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       siteDetail: _siteDetail,
       selectedFloorMap: _selectedFloorMap,
       selectedPoint: _selectedPoint,
-      internetResult: _internetResult,
-      lastRecordedPoint: _lastRecordedPoint,
+      completedPointIds: _completedPointIds,
       internetProgress: _internetProgress,
       displayedOverallProgress: _displayedOverallProgress,
       isLoading: _isLoading,
@@ -585,7 +624,6 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       siteDetailError: _siteDetailError,
       internetMeasurementError: _internetMeasurementError,
       measurementSubmissionMessage: _measurementSubmissionMessage,
-      lastRecordedAt: _lastRecordedAt,
       onRecordMeasurement: _recordMeasurement,
       onSelectPoint: (point) {
         setState(() {
@@ -625,8 +663,7 @@ class MeasurementsView extends StatelessWidget {
     required this.siteDetail,
     required this.selectedFloorMap,
     required this.selectedPoint,
-    required this.internetResult,
-    required this.lastRecordedPoint,
+    required this.completedPointIds,
     required this.internetProgress,
     required this.displayedOverallProgress,
     required this.isLoading,
@@ -637,7 +674,6 @@ class MeasurementsView extends StatelessWidget {
     required this.siteDetailError,
     required this.internetMeasurementError,
     required this.measurementSubmissionMessage,
-    required this.lastRecordedAt,
     required this.onRecordMeasurement,
     required this.onSelectPoint,
     required this.onSelectFloorMap,
@@ -651,8 +687,7 @@ class MeasurementsView extends StatelessWidget {
   final SiteDetail? siteDetail;
   final FloorMap? selectedFloorMap;
   final SitePoint? selectedPoint;
-  final InternetMeasurementResult? internetResult;
-  final SitePoint? lastRecordedPoint;
+  final Set<String> completedPointIds;
   final InternetSpeedTestProgress internetProgress;
   final double displayedOverallProgress;
   final bool isLoading;
@@ -663,7 +698,6 @@ class MeasurementsView extends StatelessWidget {
   final String? siteDetailError;
   final String? internetMeasurementError;
   final String? measurementSubmissionMessage;
-  final DateTime? lastRecordedAt;
   final Future<void> Function() onRecordMeasurement;
   final ValueChanged<SitePoint> onSelectPoint;
   final ValueChanged<FloorMap> onSelectFloorMap;
@@ -702,74 +736,13 @@ class MeasurementsView extends StatelessWidget {
         !isLoading &&
         !isRefreshing &&
         !isRecordingMeasurement;
-    final wifiItems = <({String label, String value})>[
-      (label: 'SSID', value: wifiMetadata.ssid ?? 'Not available yet'),
-      (label: 'BSSID', value: wifiMetadata.bssid ?? 'Not available yet'),
-      (label: 'Channel', value: _formatInt(wifiMetadata.channel)),
-      (
-        label: 'Channel frequency',
-        value: _formatInt(wifiMetadata.channelFrequency),
-      ),
-      (label: 'Client IP', value: wifiMetadata.clientIp ?? 'Not available yet'),
-      (label: 'Frequency (MHz)', value: _formatInt(wifiMetadata.frequencyMhz)),
-      (
-        label: 'Interface name',
-        value: wifiMetadata.interfaceName ?? 'Not available yet',
-      ),
-      (label: 'Platform', value: wifiMetadata.platform ?? 'Not available yet'),
-      (label: 'RSSI', value: _formatInt(wifiMetadata.rssi)),
-      (label: 'Signal quality', value: _formatInt(wifiMetadata.signalQuality)),
-      (
-        label: 'Signal quality percent',
-        value: wifiMetadata.signalQualityPercent == null
-            ? 'Not available yet'
-            : '${wifiMetadata.signalQualityPercent}%',
-      ),
-      (
-        label: 'Signal strength',
-        value: _formatInt(wifiMetadata.signalStrength),
-      ),
-    ];
-
     final content = AppPage(
       children: [
         _MeasurementHeader(
           selectedSiteSlug: selectedSiteSlug,
           onOpenSiteSettings: onOpenSiteSettings,
-          wifiMetadata: wifiMetadata,
         ),
         SizedBox(height: tokens.sectionGap),
-        if (isLoading)
-          Padding(
-            padding: EdgeInsets.only(bottom: tokens.sectionGap),
-            child: AppPanel(
-              child: Row(
-                children: [
-                  const LoadingIndicator.medium(),
-                  SizedBox(width: tokens.spacing.regular),
-                  Expanded(
-                    child: Text(
-                      'Loading current Wi-Fi metadata from this device.',
-                      style: textTheme.bodyMedium,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (errorMessage != null)
-          Padding(
-            padding: EdgeInsets.only(bottom: tokens.sectionGap),
-            child: AppBanner(icon: Icons.info_outline, message: errorMessage!),
-          ),
-        if (!isLoading && wifiMetadata.isEmpty && errorMessage == null)
-          Padding(
-            padding: EdgeInsets.only(bottom: tokens.sectionGap),
-            child: AppBanner(
-              icon: Icons.info_outline,
-              message: _statusMessage(wifiMetadata.status),
-            ),
-          ),
         Padding(
           padding: EdgeInsets.only(bottom: tokens.sectionGap),
           child: AppPanel(
@@ -808,6 +781,7 @@ class MeasurementsView extends StatelessWidget {
                         floorMap: activeFloorMap,
                         points: pointsForSelectedFloor,
                         selectedPoint: selectedPoint,
+                        completedPointIds: completedPointIds,
                         onSelectPoint: onSelectPoint,
                       ),
                       SizedBox(height: tokens.spacing.regular),
@@ -820,6 +794,10 @@ class MeasurementsView extends StatelessWidget {
                         value:
                             selectedPoint?.label ??
                             'Choose a point on the floorplan',
+                      ),
+                      AppInfoRow(
+                        label: 'Completed points',
+                        value: '${completedPointIds.length}',
                       ),
                       AppInfoRow(
                         label: 'Point position',
@@ -839,122 +817,19 @@ class MeasurementsView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Internet measurement', style: textTheme.titleLarge),
+                Text('Measurement', style: textTheme.titleLarge),
                 SizedBox(height: tokens.spacing.compact),
                 Text(
                   selectedPoint == null
-                      ? 'Choose a point on the floorplan, then record a public internet speed measurement.'
-                      : 'Record a public internet speed measurement for ${selectedPoint!.label ?? 'the selected point'}.',
+                      ? 'Choose a point on the floorplan, then record a measurement.'
+                      : 'Record a measurement for ${selectedPoint!.label ?? 'the selected point'}.',
                   style: textTheme.bodyMedium,
                 ),
-                SizedBox(height: tokens.spacing.regular),
-                Text(_primarySpeedLabel(), style: textTheme.displaySmall),
-                SizedBox(height: tokens.spacing.regular),
-                LinearProgressIndicator(
-                  value: displayedOverallProgress,
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                SizedBox(height: tokens.spacing.regular),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Download',
-                        value: _formatMbps(
-                          internetResult?.downloadBps ??
-                              internetProgress.downloadBps,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Upload',
-                        value: _formatMbps(
-                          internetResult?.uploadBps ??
-                              internetProgress.uploadBps,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Idle ping',
-                        value: internetProgress.idleLatencyMs == null
-                            ? 'Pending'
-                            : '${internetProgress.idleLatencyMs!.toStringAsFixed(0)} ms',
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: tokens.spacing.compact),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Idle jitter',
-                        value: internetProgress.idleJitterMs == null
-                            ? 'Pending'
-                            : '${internetProgress.idleJitterMs!.toStringAsFixed(1)} ms',
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Loaded ping',
-                        value: internetProgress.phaseLatencyMs == null
-                            ? 'Pending'
-                            : '${internetProgress.phaseLatencyMs!.toStringAsFixed(0)} ms',
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Loaded jitter',
-                        value: internetProgress.phaseJitterMs == null
-                            ? 'Pending'
-                            : '${internetProgress.phaseJitterMs!.toStringAsFixed(1)} ms',
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: tokens.spacing.compact),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Idle loss',
-                        value: internetProgress.idlePacketLossPercent == null
-                            ? 'Pending'
-                            : '${internetProgress.idlePacketLossPercent!.toStringAsFixed(1)}%',
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Loaded loss',
-                        value: internetProgress.phasePacketLossPercent == null
-                            ? 'Pending'
-                            : '${internetProgress.phasePacketLossPercent!.toStringAsFixed(1)}%',
-                      ),
-                    ),
-                    SizedBox(width: tokens.spacing.compact),
-                    Expanded(
-                      child: AppMetricTile(
-                        label: 'Streams',
-                        value: internetProgress.streamCount == null
-                            ? 'Pending'
-                            : '${internetProgress.streamCount}',
-                      ),
-                    ),
-                  ],
-                ),
-                if (lastRecordedAt != null) ...[
+                if (measurementSubmissionMessage != null) ...[
                   SizedBox(height: tokens.spacing.regular),
-                  Text(
-                    'Latest capture: ${_formatRecordedAt(lastRecordedAt!)}',
-                    style: textTheme.bodySmall,
+                  AppBanner(
+                    icon: Icons.cloud_done_outlined,
+                    message: measurementSubmissionMessage!,
                   ),
                 ],
                 if (internetMeasurementError != null) ...[
@@ -965,143 +840,25 @@ class MeasurementsView extends StatelessWidget {
                     message: internetMeasurementError!,
                   ),
                 ],
-                if (measurementSubmissionMessage != null) ...[
+                if (isRecordingMeasurement) ...[
                   SizedBox(height: tokens.spacing.regular),
-                  AppBanner(
-                    icon: Icons.cloud_done_outlined,
-                    message: measurementSubmissionMessage!,
+                  LinearProgressIndicator(
+                    value: displayedOverallProgress,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ],
                 SizedBox(height: tokens.spacing.regular),
-                FilledButton(
-                  onPressed: canRecordMeasurement ? onRecordMeasurement : null,
-                  child: isRecordingMeasurement
-                      ? const LoadingIndicator.small()
-                      : const Text('Record measurement'),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: canRecordMeasurement ? onRecordMeasurement : null,
+                    child: isRecordingMeasurement
+                        ? const LoadingIndicator.small()
+                        : const Text('Record measurement'),
+                  ),
                 ),
               ],
-            ),
-          ),
-        ),
-        if (internetResult != null)
-          Padding(
-            padding: EdgeInsets.only(bottom: tokens.sectionGap),
-            child: AppPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Latest recorded measurement',
-                    style: textTheme.titleLarge,
-                  ),
-                  SizedBox(height: tokens.spacing.regular),
-                  AppInfoRow(label: 'Site', value: selectedSiteSlug),
-                  AppInfoRow(
-                    label: 'Point',
-                    value: lastRecordedPoint?.label ?? 'No point selected',
-                  ),
-                  AppInfoRow(
-                    label: 'Backend',
-                    value: internetResult?.backend ?? 'Not available',
-                  ),
-                  AppInfoRow(
-                    label: 'Download',
-                    value: _formatMbps(internetResult?.downloadBps),
-                  ),
-                  AppInfoRow(
-                    label: 'Download samples',
-                    value: '${internetResult?.downloadSamplesBps.length ?? 0}',
-                  ),
-                  AppInfoRow(
-                    label: 'Upload',
-                    value: _formatMbps(internetResult?.uploadBps),
-                  ),
-                  AppInfoRow(
-                    label: 'Upload samples',
-                    value: '${internetResult?.uploadSamplesBps.length ?? 0}',
-                  ),
-                  AppInfoRow(
-                    label: 'Idle latency',
-                    value: internetResult?.idleLatencyMs == null
-                        ? 'Not available'
-                        : '${internetResult!.idleLatencyMs!.toStringAsFixed(0)} ms',
-                  ),
-                  AppInfoRow(
-                    label: 'Idle jitter',
-                    value: internetResult?.idleJitterMs == null
-                        ? 'Not available'
-                        : '${internetResult!.idleJitterMs!.toStringAsFixed(1)} ms',
-                  ),
-                  AppInfoRow(
-                    label: 'Idle packet loss',
-                    value: internetResult?.idlePacketLossPercent == null
-                        ? 'Not available'
-                        : '${internetResult!.idlePacketLossPercent!.toStringAsFixed(1)}%',
-                  ),
-                  AppInfoRow(
-                    label: 'Streams',
-                    value: internetResult?.streamCount == null
-                        ? 'Not available'
-                        : '${internetResult!.streamCount}',
-                  ),
-                  AppInfoRow(
-                    label: 'Download latency',
-                    value: internetResult?.downloadLoadedLatencyMs == null
-                        ? 'Not available'
-                        : '${internetResult!.downloadLoadedLatencyMs!.toStringAsFixed(0)} ms',
-                  ),
-                  AppInfoRow(
-                    label: 'Download jitter',
-                    value: internetResult?.downloadLoadedJitterMs == null
-                        ? 'Not available'
-                        : '${internetResult!.downloadLoadedJitterMs!.toStringAsFixed(1)} ms',
-                  ),
-                  AppInfoRow(
-                    label: 'Download packet loss',
-                    value:
-                        internetResult?.downloadLoadedPacketLossPercent == null
-                        ? 'Not available'
-                        : '${internetResult!.downloadLoadedPacketLossPercent!.toStringAsFixed(1)}%',
-                  ),
-                  AppInfoRow(
-                    label: 'Upload latency',
-                    value: internetResult?.uploadLoadedLatencyMs == null
-                        ? 'Not available'
-                        : '${internetResult!.uploadLoadedLatencyMs!.toStringAsFixed(0)} ms',
-                  ),
-                  AppInfoRow(
-                    label: 'Upload jitter',
-                    value: internetResult?.uploadLoadedJitterMs == null
-                        ? 'Not available'
-                        : '${internetResult!.uploadLoadedJitterMs!.toStringAsFixed(1)} ms',
-                  ),
-                  AppInfoRow(
-                    label: 'Upload packet loss',
-                    value: internetResult?.uploadLoadedPacketLossPercent == null
-                        ? 'Not available'
-                        : '${internetResult!.uploadLoadedPacketLossPercent!.toStringAsFixed(1)}%',
-                  ),
-                  AppInfoRow(
-                    label: 'Download size',
-                    value: _formatBytes(internetResult?.downloadSize),
-                  ),
-                  AppInfoRow(
-                    label: 'Upload size',
-                    value: _formatBytes(internetResult?.uploadSize),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ...wifiItems.map(
-          (item) => Padding(
-            padding: EdgeInsets.only(bottom: tokens.spacing.compact),
-            child: AppPanel(
-              padding: EdgeInsets.all(tokens.spacing.compact),
-              child: ListTile(
-                title: Text(item.label),
-                subtitle: Text(item.value),
-              ),
             ),
           ),
         ),
@@ -1118,71 +875,16 @@ class MeasurementsView extends StatelessWidget {
     );
   }
 
-  String _formatInt(int? value) {
-    return value == null ? 'Not available yet' : '$value';
-  }
-
-  String _formatMbps(double? value) {
-    if (value == null) {
-      return 'Pending';
-    }
-
-    return '${(value / 1000 / 1000).toStringAsFixed(1)} Mbps';
-  }
-
-  String _formatBytes(double? bytes) {
-    if (bytes == null) {
-      return 'Not available';
-    }
-
-    final megabytes = bytes / 1000 / 1000;
-    return '${megabytes.toStringAsFixed(1)} MB';
-  }
-
-  String _primarySpeedLabel() {
-    final primaryValue = switch (internetProgress.phase) {
-      InternetSpeedTestPhase.testingUpload =>
-        internetResult?.uploadBps ?? internetProgress.uploadBps,
-      InternetSpeedTestPhase.completed =>
-        internetResult?.uploadBps ?? internetResult?.downloadBps,
-      _ => internetResult?.downloadBps ?? internetProgress.downloadBps,
-    };
-
-    return primaryValue == null ? '--' : _formatMbps(primaryValue);
-  }
-
-  String _formatRecordedAt(DateTime value) {
-    final localValue = value.toLocal();
-    final hour = localValue.hour.toString().padLeft(2, '0');
-    final minute = localValue.minute.toString().padLeft(2, '0');
-    final second = localValue.second.toString().padLeft(2, '0');
-    return '${localValue.year}-${localValue.month.toString().padLeft(2, '0')}-${localValue.day.toString().padLeft(2, '0')} $hour:$minute:$second';
-  }
-
-  String _statusMessage(WifiMetadataStatus status) {
-    return switch (status) {
-      WifiMetadataStatus.available => AppMessages.wifiAvailable,
-      WifiMetadataStatus.wifiDisabled => AppMessages.wifiDisabled,
-      WifiMetadataStatus.wifiNotConnected => AppMessages.wifiNotConnected,
-      WifiMetadataStatus.permissionsMissing =>
-        AppMessages.wifiPermissionsMissing,
-      WifiMetadataStatus.unsupportedPlatform =>
-        AppMessages.wifiUnsupportedPlatform,
-      WifiMetadataStatus.unavailable => AppMessages.wifiUnavailable,
-    };
-  }
 }
 
 class _MeasurementHeader extends StatelessWidget {
   const _MeasurementHeader({
     required this.selectedSiteSlug,
     required this.onOpenSiteSettings,
-    required this.wifiMetadata,
   });
 
   final String selectedSiteSlug;
   final VoidCallback? onOpenSiteSettings;
-  final WifiMetadata wifiMetadata;
 
   @override
   Widget build(BuildContext context) {
@@ -1239,9 +941,7 @@ class _MeasurementHeader extends StatelessWidget {
         Text('Measurement', style: textTheme.headlineMedium),
         SizedBox(height: tokens.spacing.compact),
         Text(
-          wifiMetadata.ssid == null
-              ? 'Collect Wi-Fi metadata and internet speed measurements for this site.'
-              : 'Connected to ${wifiMetadata.ssid}. Capture a measurement and upload it to the server.',
+          'Select a floor, choose a point, and record measurements for this site.',
           style: textTheme.bodyMedium?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -1257,6 +957,7 @@ class _FloorplanPreview extends StatelessWidget {
     required this.floorMap,
     required this.points,
     required this.selectedPoint,
+    required this.completedPointIds,
     required this.onSelectPoint,
   });
 
@@ -1264,6 +965,7 @@ class _FloorplanPreview extends StatelessWidget {
   final FloorMap floorMap;
   final List<SitePoint> points;
   final SitePoint? selectedPoint;
+  final Set<String> completedPointIds;
   final ValueChanged<SitePoint> onSelectPoint;
 
   @override
@@ -1327,6 +1029,7 @@ class _FloorplanPreview extends StatelessWidget {
                             child: _FloorplanPointDot(
                               point: point,
                               isSelected: point.id == selectedPoint?.id,
+                              isCompleted: completedPointIds.contains(point.id),
                               onTap: () => onSelectPoint(point),
                             ),
                           ),
@@ -1488,11 +1191,13 @@ class _FloorplanPointDot extends StatelessWidget {
   const _FloorplanPointDot({
     required this.point,
     required this.isSelected,
+    required this.isCompleted,
     required this.onTap,
   });
 
   final SitePoint point;
   final bool isSelected;
+  final bool isCompleted;
   final VoidCallback onTap;
 
   @override
@@ -1500,9 +1205,13 @@ class _FloorplanPointDot extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final fillColor = point.isBaseStation
         ? colorScheme.tertiary
+        : isCompleted
+        ? const Color(0xFF2E7D32)
         : (isSelected ? colorScheme.primary : colorScheme.surface);
     final borderColor = point.isBaseStation
         ? colorScheme.onTertiary
+        : isCompleted
+        ? const Color(0xFFA5D6A7)
         : (isSelected ? colorScheme.onPrimary : colorScheme.primary);
 
     return Tooltip(
@@ -1519,10 +1228,13 @@ class _FloorplanPointDot extends StatelessWidget {
               shape: BoxShape.circle,
               color: fillColor,
               border: Border.all(color: borderColor, width: 2),
-              boxShadow: isSelected
+              boxShadow: isSelected || isCompleted
                   ? [
                       BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: 0.32),
+                        color: (isCompleted
+                                ? const Color(0xFF2E7D32)
+                                : colorScheme.primary)
+                            .withValues(alpha: 0.32),
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),

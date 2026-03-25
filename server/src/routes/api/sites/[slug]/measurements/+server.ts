@@ -9,14 +9,15 @@ import {
 } from "$lib/server/services/measurements";
 import { getSiteBySlug } from "$lib/server/services/sites";
 
-export async function GET({ params }) {
+export async function GET({ params, url }) {
 	const site = await getSiteBySlug(params.slug);
 
 	if (!site) {
 		return failure(404, `Site '${params.slug}' was not found.`);
 	}
 
-	const measurements = await listMeasurements(100, site.id);
+	const deviceSlug = url.searchParams.get("device_slug")?.trim() || undefined;
+	const measurements = await listMeasurements(100, site.id, deviceSlug);
 
 	return ok({
 		site: {
