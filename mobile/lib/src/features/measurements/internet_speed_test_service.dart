@@ -17,8 +17,10 @@ final internetSpeedTestServiceProvider = Provider<InternetSpeedTestService>((
 
   switch (settings.backend) {
     case InternetSpeedTestBackendPreference.publicLibrespeed:
-      return const InternetSpeedTestService._backend(
+      return InternetSpeedTestService._backend(
         _BackendConfig.publicLibrespeed(),
+        httpSettings: settings.http,
+        measurementLabSettings: settings.measurementLab,
       );
     case InternetSpeedTestBackendPreference.customLibrespeed:
       final customUrl = settings.customLibrespeedUrl;
@@ -36,14 +38,20 @@ final internetSpeedTestServiceProvider = Provider<InternetSpeedTestService>((
           backendName: 'custom_librespeed',
           baseUri: customBaseUri.toString(),
         ),
+        httpSettings: settings.http,
+        measurementLabSettings: settings.measurementLab,
       );
     case InternetSpeedTestBackendPreference.cloudflare:
       return InternetSpeedTestService._backend(
         const _BackendConfig.cloudflare(),
+        httpSettings: settings.http,
+        measurementLabSettings: settings.measurementLab,
       );
     case InternetSpeedTestBackendPreference.measurementLab:
       return InternetSpeedTestService._backend(
         const _BackendConfig.measurementLab(),
+        httpSettings: settings.http,
+        measurementLabSettings: settings.measurementLab,
       );
   }
 });
@@ -116,23 +124,39 @@ typedef InternetSpeedTestProgressCallback =
     void Function(InternetSpeedTestProgress progress);
 
 class InternetSpeedTestService {
-  const InternetSpeedTestService._backend(this._backendConfig)
-    : unavailableMessage = null;
+  const InternetSpeedTestService._backend(
+    this._backendConfig, {
+    required HttpInternetSpeedTestAdvancedSettings httpSettings,
+    required MeasurementLabAdvancedSettings measurementLabSettings,
+  }) : unavailableMessage = null,
+       _httpSettings = httpSettings,
+       _measurementLabSettings = measurementLabSettings;
 
   const InternetSpeedTestService.unavailable(this.unavailableMessage)
-    : _backendConfig = null;
+    : _backendConfig = null,
+      _httpSettings = const HttpInternetSpeedTestAdvancedSettings(
+        downloadStageBytes: [100 * 1000],
+        uploadStageBytes: [100 * 1000],
+        parallelStreams: 1,
+        latencySampleCount: 10,
+      ),
+      _measurementLabSettings = const MeasurementLabAdvancedSettings(
+        downloadDurationSeconds: 15,
+        uploadDurationSeconds: 10,
+        latencySampleCount: 10,
+      );
 
   final _BackendConfig? _backendConfig;
   final String? unavailableMessage;
+  final HttpInternetSpeedTestAdvancedSettings _httpSettings;
+  final MeasurementLabAdvancedSettings _measurementLabSettings;
 
   static const int _uploadChunkSizeBytes = 256 * 1000;
   static const int _measurementLabUploadChunkSizeBytes = 256 * 1000;
   static const Duration _measurementLabUploadYield = Duration(milliseconds: 4);
   static const String _ndt7SubProtocol = 'net.measurementlab.ndt.v7';
   static const int _loadedLatencyProbeIntervalMs = 400;
-  static const int _idleLatencySampleCount = 10;
-  static const int _streamCount = 4;
-  static const List<_StageDefinition> _downloadStages = [
+  static const List<_StageDefinition> _defaultDownloadStages = [
     _StageDefinition(bytes: 100 * 1000, label: '100 KB'),
     _StageDefinition(bytes: 1 * 1000 * 1000, label: '1 MB'),
     _StageDefinition(bytes: 10 * 1000 * 1000, label: '10 MB'),
@@ -140,7 +164,7 @@ class InternetSpeedTestService {
     _StageDefinition(bytes: 100 * 1000 * 1000, label: '100 MB'),
     _StageDefinition(bytes: 250 * 1000 * 1000, label: '250 MB'),
   ];
-  static const List<_StageDefinition> _uploadStages = [
+  static const List<_StageDefinition> _defaultUploadStages = [
     _StageDefinition(bytes: 100 * 1000, label: '100 KB'),
     _StageDefinition(bytes: 1 * 1000 * 1000, label: '1 MB'),
     _StageDefinition(bytes: 10 * 1000 * 1000, label: '10 MB'),
@@ -148,8 +172,18 @@ class InternetSpeedTestService {
     _StageDefinition(bytes: 50 * 1000 * 1000, label: '50 MB'),
   ];
 
-  static final int totalDownloadPlannedBytes = _sumStageBytes(_downloadStages);
-  static final int totalUploadPlannedBytes = _sumStageBytes(_uploadStages);
+  List<_StageDefinition> get _downloadStages => _stagesFromBytes(
+    _httpSettings.downloadStageBytes,
+    _defaultDownloadStages,
+  );
+
+  List<_StageDefinition> get _uploadStages =>
+      _stagesFromBytes(_httpSettings.uploadStageBytes, _defaultUploadStages);
+
+  int get totalDownloadPlannedBytes => _sumStageBytes(_downloadStages);
+  int get totalUploadPlannedBytes => _sumStageBytes(_uploadStages);
+  int get _idleLatencySampleCount => _httpSettings.latencySampleCount;
+  int get _streamCount => _httpSettings.parallelStreams;
 
   Future<InternetMeasurementResult> recordInternetMeasurement({
     required InternetSpeedTestProgressCallback onProgress,
@@ -278,8 +312,12 @@ class InternetSpeedTestService {
   Future<InternetMeasurementResult> _recordMeasurementLab({
     required InternetSpeedTestProgressCallback onProgress,
   }) async {
-    const downloadDuration = Duration(seconds: 15);
-    const uploadDuration = Duration(seconds: 10);
+    final downloadDuration = Duration(
+      seconds: _measurementLabSettings.downloadDurationSeconds,
+    );
+    final uploadDuration = Duration(
+      seconds: _measurementLabSettings.uploadDurationSeconds,
+    );
     const streamCount = 1;
 
     onProgress(
@@ -466,7 +504,11 @@ class InternetSpeedTestService {
           if (event is String) {
             final rttMs = _extractMeasurementLabRttMs(event);
             if (rttMs != null) {
-              rttSamplesMs.add(rttMs);
+              _appendLimitedSample(
+                rttSamplesMs,
+                rttMs,
+                _measurementLabSettings.latencySampleCount,
+              );
             }
 
             if (phase == InternetSpeedTestPhase.testingUpload) {
@@ -1011,6 +1053,24 @@ class InternetSpeedTestService {
 
   static int _sumStageBytes(List<_StageDefinition> stages) {
     return stages.fold<int>(0, (sum, stage) => sum + stage.bytes);
+  }
+
+  List<_StageDefinition> _stagesFromBytes(
+    List<int> values,
+    List<_StageDefinition> defaults,
+  ) {
+    final selected = values.toSet();
+    final stages = defaults
+        .where((stage) => selected.contains(stage.bytes))
+        .toList(growable: false);
+    return stages.isEmpty ? defaults : stages;
+  }
+
+  void _appendLimitedSample(List<double> values, double value, int limit) {
+    values.add(value);
+    if (values.length > limit) {
+      values.removeAt(0);
+    }
   }
 
   double? _percentile90(List<double> values) {

@@ -202,28 +202,84 @@ class AppBusyIconButton extends StatelessWidget {
 }
 
 class AppSettingsGroup extends StatelessWidget {
-  const AppSettingsGroup({super.key, required this.children});
+  const AppSettingsGroup({
+    super.key,
+    required this.children,
+    this.flat = false,
+  });
 
   final List<Widget> children;
+  final bool flat;
 
   @override
   Widget build(BuildContext context) {
     final tokens = AppTokens.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final group = Column(
+      children: [
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index < children.length - 1)
+            Divider(
+              height: 1,
+              indent: tokens.cardPadding,
+              endIndent: tokens.cardPadding,
+            ),
+        ],
+      ],
+    );
+
+    if (flat) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(tokens.radiusLarge),
+        ),
+        child: group,
+      );
+    }
 
     return AppPanel(
       padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          for (var index = 0; index < children.length; index++) ...[
-            children[index],
-            if (index < children.length - 1)
-              Divider(
-                height: 1,
-                indent: tokens.cardPadding,
-                endIndent: tokens.cardPadding,
-              ),
-          ],
-        ],
+      child: group,
+    );
+  }
+}
+
+class AppSectionLabel extends StatelessWidget {
+  const AppSectionLabel({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Text(
+      label,
+      style: textTheme.labelLarge?.copyWith(
+        color: colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+class AppSectionNote extends StatelessWidget {
+  const AppSectionNote({super.key, required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Text(
+      message,
+      style: textTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurfaceVariant,
       ),
     );
   }
