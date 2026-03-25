@@ -34,13 +34,12 @@ class AppMessages {
   static const customLibrespeedUrlRequired =
       'Enter a valid http:// or https:// URL for your custom Librespeed server.';
   static const intranetServerRequired =
-      'Enter a valid intranet iperf3 server host or IP address.';
+      'Enter a valid local iperf3 server host or IP address.';
   static const intranetServerConnectionFailed =
-      'The configured intranet iperf3 server could not be reached.';
+      'The configured local iperf3 server could not be reached.';
   static const intranetUnavailable =
-      'The intranet iperf3 setting is configured, but this mobile app build does not include a native iperf3 client yet.';
-  static const intranetNoModesSelected =
-      'No intranet iperf3 modes are enabled.';
+      'The local iperf3 setting is configured, but this mobile app build does not include a native iperf3 client yet.';
+  static const intranetNoModesSelected = 'No local iperf3 modes are enabled.';
   static const measurementLabUnavailable =
       'Measurement Lab could not provide a test server right now. Try again later.';
 }

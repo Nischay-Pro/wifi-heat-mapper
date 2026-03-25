@@ -396,7 +396,7 @@ class _SettingsTab extends ConsumerWidget {
           flat: true,
           children: [
             AppSettingsRow(
-              title: 'Internet speed test',
+              title: 'Internet measurements',
               subtitle: internetSettings.backendLabel,
               onTap: () {
                 Navigator.of(context).push(
@@ -407,7 +407,7 @@ class _SettingsTab extends ConsumerWidget {
               },
             ),
             AppSettingsRow(
-              title: 'Intranet speed test',
+              title: 'Local measurements',
               subtitle: intranetSettings.serverLabel,
               onTap: () {
                 Navigator.of(context).push(
@@ -471,7 +471,7 @@ class _InternetSettingsPage extends ConsumerWidget {
     final tokens = AppTokens.of(context);
     final settings = ref.watch(internetSpeedTestSettingsControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Internet speed test')),
+      appBar: AppBar(title: const Text('Internet measurements')),
       body: SafeArea(
         child: AppPage(
           children: [
@@ -694,6 +694,7 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
   late final TextEditingController _portController;
   String? _errorMessage;
   String? _statusMessage;
+  bool _statusIsError = false;
   bool _isTestingConnection = false;
 
   @override
@@ -719,6 +720,8 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
     if (host.isEmpty || port == null || port < 1 || port > 65535) {
       setState(() {
         _errorMessage = AppMessages.intranetServerRequired;
+        _statusMessage = null;
+        _statusIsError = false;
       });
       return;
     }
@@ -733,7 +736,8 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
 
     setState(() {
       _errorMessage = null;
-      _statusMessage = 'Saved intranet iperf3 server.';
+      _statusMessage = 'Saved local iperf3 server.';
+      _statusIsError = false;
     });
   }
 
@@ -752,6 +756,7 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
       _isTestingConnection = true;
       _errorMessage = null;
       _statusMessage = null;
+      _statusIsError = false;
     });
 
     final connected = await ref
@@ -765,8 +770,9 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
     setState(() {
       _isTestingConnection = false;
       _statusMessage = connected
-          ? 'Connected to intranet iperf3 server.'
+          ? 'Connected to local iperf3 server.'
           : AppMessages.intranetServerConnectionFailed;
+      _statusIsError = !connected;
     });
   }
 
@@ -779,7 +785,7 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Intranet speed test')),
+      appBar: AppBar(title: const Text('Local measurements')),
       body: SafeArea(
         child: AppPage(
           children: [
@@ -787,7 +793,7 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
             SizedBox(height: tokens.spacing.compact),
             const AppSectionNote(
               message:
-                  'Configure the intranet iperf3 server used for LAN throughput measurements.',
+                  'Configure the local iperf3 server used for LAN throughput measurements.',
             ),
             SizedBox(height: tokens.sectionGap),
             AppPanel(
@@ -805,9 +811,11 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
                       errorText: _errorMessage,
                     ),
                     onChanged: (_) {
-                      if (_errorMessage != null) {
+                      if (_errorMessage != null || _statusMessage != null) {
                         setState(() {
                           _errorMessage = null;
+                          _statusMessage = null;
+                          _statusIsError = false;
                         });
                       }
                     },
@@ -828,9 +836,14 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
                   ),
                   if (_statusMessage != null) ...[
                     SizedBox(height: tokens.spacing.regular),
-                    Text(
-                      _statusMessage!,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    AppBanner(
+                      icon: _statusIsError
+                          ? Icons.error_outline_rounded
+                          : Icons.check_circle_outline_rounded,
+                      iconColor: _statusIsError
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
+                      message: _statusMessage!,
                     ),
                   ],
                   SizedBox(height: tokens.spacing.regular),
@@ -838,10 +851,7 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
                     spacing: tokens.spacing.compact,
                     runSpacing: tokens.spacing.compact,
                     children: [
-                      FilledButton(
-                        onPressed: _save,
-                        child: const Text('Save intranet server'),
-                      ),
+                      FilledButton(onPressed: _save, child: const Text('Save')),
                       OutlinedButton(
                         onPressed: _isTestingConnection
                             ? null
@@ -887,22 +897,6 @@ class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
                   ),
                 ],
               ),
-            ),
-            SizedBox(height: tokens.sectionGap),
-            AppSettingsGroup(
-              flat: true,
-              children: [
-                AppSettingsRow(
-                  title: 'Enabled iperf modes',
-                  subtitle: settings.modes.summary,
-                ),
-              ],
-            ),
-            SizedBox(height: tokens.sectionGap),
-            const AppBanner(
-              icon: Icons.info_outline_rounded,
-              message:
-                  'Intranet measurements map to WHM local_result. The current mobile app still needs a native iperf3 client bridge before these measurements can run.',
             ),
           ],
         ),
@@ -1255,59 +1249,47 @@ class _HttpBackendAdvancedSettingsPageState
             SizedBox(height: tokens.spacing.compact),
             AppSectionNote(message: widget.subtitle),
             SizedBox(height: tokens.sectionGap),
-            const AppSectionLabel(label: 'Download measurements'),
+            const AppSectionLabel(label: 'Download tests'),
             SizedBox(height: tokens.spacing.compact),
             const AppSectionNote(
-              message: 'Choose which download stages run during the test.',
+              message: 'Choose which download tests run during the speed test.',
             ),
             SizedBox(height: tokens.spacing.regular),
-            AppSettingsGroup(
-              flat: true,
-              children: [
-                for (final option in httpDownloadStageOptions)
-                  _SelectableSettingsRow(
-                    title: option.label,
-                    subtitle: 'Run this download measurement stage.',
-                    isSelected: settings.http.downloadStageBytes.contains(
-                      option.bytes,
-                    ),
-                    onTap: () => controller.setHttpDownloadStageEnabled(
-                      option.bytes,
-                      !settings.http.downloadStageBytes.contains(option.bytes),
-                    ),
-                  ),
-              ],
+            _NumericMultiSelectField(
+              label: 'Download tests',
+              value: _selectedStageSummary(
+                options: httpDownloadStageOptions,
+                selectedBytes: settings.http.downloadStageBytes,
+              ),
+              options: httpDownloadStageOptions,
+              selectedBytes: settings.http.downloadStageBytes,
+              onChanged: (bytes, enabled) =>
+                  controller.setHttpDownloadStageEnabled(bytes, enabled),
             ),
             SizedBox(height: tokens.sectionGap),
-            const AppSectionLabel(label: 'Upload measurements'),
+            const AppSectionLabel(label: 'Upload tests'),
             SizedBox(height: tokens.spacing.compact),
             const AppSectionNote(
-              message: 'Choose which upload stages run during the test.',
+              message: 'Choose which upload tests run during the speed test.',
             ),
             SizedBox(height: tokens.spacing.regular),
-            AppSettingsGroup(
-              flat: true,
-              children: [
-                for (final option in httpUploadStageOptions)
-                  _SelectableSettingsRow(
-                    title: option.label,
-                    subtitle: 'Run this upload measurement stage.',
-                    isSelected: settings.http.uploadStageBytes.contains(
-                      option.bytes,
-                    ),
-                    onTap: () => controller.setHttpUploadStageEnabled(
-                      option.bytes,
-                      !settings.http.uploadStageBytes.contains(option.bytes),
-                    ),
-                  ),
-              ],
+            _NumericMultiSelectField(
+              label: 'Upload tests',
+              value: _selectedStageSummary(
+                options: httpUploadStageOptions,
+                selectedBytes: settings.http.uploadStageBytes,
+              ),
+              options: httpUploadStageOptions,
+              selectedBytes: settings.http.uploadStageBytes,
+              onChanged: (bytes, enabled) =>
+                  controller.setHttpUploadStageEnabled(bytes, enabled),
             ),
             SizedBox(height: tokens.sectionGap),
-            const AppSectionLabel(label: 'Execution'),
+            const AppSectionLabel(label: 'Parallel streams'),
             SizedBox(height: tokens.spacing.compact),
             const AppSectionNote(
               message:
-                  'Configure how many connections run and how many latency samples are collected.',
+                  'Choose how many simultaneous connections run during the speed test.',
             ),
             SizedBox(height: tokens.spacing.regular),
             AppPanel(
@@ -1333,11 +1315,18 @@ class _HttpBackendAdvancedSettingsPageState
                     alignment: Alignment.centerLeft,
                     child: FilledButton.tonal(
                       onPressed: _saveParallelStreams,
-                      child: const Text('Save streams'),
+                      child: const Text('Save'),
                     ),
                   ),
                 ],
               ),
+            ),
+            SizedBox(height: tokens.sectionGap),
+            const AppSectionLabel(label: 'Latency samples'),
+            SizedBox(height: tokens.spacing.compact),
+            const AppSectionNote(
+              message:
+                  'Choose how many latency samples are collected during the speed test.',
             ),
             SizedBox(height: tokens.spacing.regular),
             AppPanel(
@@ -1363,7 +1352,7 @@ class _HttpBackendAdvancedSettingsPageState
                     alignment: Alignment.centerLeft,
                     child: FilledButton.tonal(
                       onPressed: _saveLatencySampleCount,
-                      child: const Text('Save samples'),
+                      child: const Text('Save'),
                     ),
                   ),
                 ],
@@ -1553,7 +1542,7 @@ class _MeasurementLabAdvancedSettingsPageState
                     alignment: Alignment.centerLeft,
                     child: FilledButton.tonal(
                       onPressed: _saveDownloadDuration,
-                      child: const Text('Save download duration'),
+                      child: const Text('Save'),
                     ),
                   ),
                 ],
@@ -1589,7 +1578,7 @@ class _MeasurementLabAdvancedSettingsPageState
                     alignment: Alignment.centerLeft,
                     child: FilledButton.tonal(
                       onPressed: _saveUploadDuration,
-                      child: const Text('Save upload duration'),
+                      child: const Text('Save'),
                     ),
                   ),
                 ],
@@ -1626,7 +1615,7 @@ class _MeasurementLabAdvancedSettingsPageState
                     alignment: Alignment.centerLeft,
                     child: FilledButton.tonal(
                       onPressed: _saveLatencySampleCount,
-                      child: const Text('Save samples'),
+                      child: const Text('Save'),
                     ),
                   ),
                 ],
@@ -1793,6 +1782,133 @@ class SiteSettingsPage extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+String _selectedStageSummary({
+  required List<InternetStageOption> options,
+  required List<int> selectedBytes,
+}) {
+  final labels = options
+      .where((option) => selectedBytes.contains(option.bytes))
+      .map((option) => option.label)
+      .toList(growable: false);
+  if (labels.isEmpty) {
+    return 'No stages selected';
+  }
+
+  return labels.join(', ');
+}
+
+class _NumericMultiSelectField extends StatelessWidget {
+  const _NumericMultiSelectField({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.selectedBytes,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<InternetStageOption> options;
+  final List<int> selectedBytes;
+  final Future<void> Function(int bytes, bool enabled) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(24);
+
+    return InkWell(
+      borderRadius: radius,
+      onTap: () => _openPicker(context),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHighest,
+          contentPadding: const EdgeInsets.fromLTRB(22, 24, 20, 20),
+          suffixIcon: const Icon(Icons.arrow_drop_down_rounded),
+          border: OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+            gapPadding: 10,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: radius,
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+            gapPadding: 10,
+          ),
+        ),
+        child: Text(value, maxLines: 2, overflow: TextOverflow.ellipsis),
+      ),
+    );
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final textTheme = Theme.of(context).textTheme;
+    final tokens = AppTokens.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final draftSelection = {...selectedBytes};
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  tokens.pagePadding,
+                  0,
+                  tokens.pagePadding,
+                  tokens.pagePadding,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.75,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(label, style: textTheme.titleLarge),
+                      SizedBox(height: tokens.spacing.compact),
+                      Flexible(
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            for (final option in options)
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(option.label),
+                                value: draftSelection.contains(option.bytes),
+                                onChanged: (checked) async {
+                                  final enabled = checked ?? false;
+                                  setModalState(() {
+                                    if (enabled) {
+                                      draftSelection.add(option.bytes);
+                                    } else {
+                                      draftSelection.remove(option.bytes);
+                                    }
+                                  });
+                                  await onChanged(option.bytes, enabled);
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

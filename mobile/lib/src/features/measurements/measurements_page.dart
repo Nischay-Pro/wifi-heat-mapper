@@ -668,15 +668,15 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
   String _formatLocalMeasurementNotice(String message) {
     final trimmed = message.trim();
     if (trimmed.isEmpty) {
-      return 'Intranet measurement skipped.';
+      return 'Local measurement skipped.';
     }
 
-    if (trimmed.startsWith('Intranet measurement')) {
+    if (trimmed.startsWith('Local measurement')) {
       return trimmed;
     }
 
     final normalized = trimmed.endsWith('.') ? trimmed : '$trimmed.';
-    return 'Intranet measurement skipped: $normalized';
+    return 'Local measurement skipped: $normalized';
   }
 
   @override

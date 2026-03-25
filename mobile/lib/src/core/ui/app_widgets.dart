@@ -234,10 +234,7 @@ class AppSettingsGroup extends StatelessWidget {
       return group;
     }
 
-    return AppPanel(
-      padding: EdgeInsets.zero,
-      child: group,
-    );
+    return AppPanel(padding: EdgeInsets.zero, child: group);
   }
 }
 
@@ -304,11 +301,7 @@ class AppSettingsRow extends StatelessWidget {
       minLeadingWidth: icon == null ? 0 : null,
       leading: icon == null
           ? null
-          : Icon(
-              icon,
-              color: colorScheme.primary,
-              size: tokens.iconMedium + 2,
-            ),
+          : Icon(icon, color: colorScheme.primary, size: tokens.iconMedium + 2),
       title: Text(title, style: textTheme.titleMedium),
       subtitle: subtitle == null
           ? null
@@ -340,6 +333,7 @@ class AppNumericBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final radius = BorderRadius.circular(24);
+    const contentPadding = EdgeInsets.fromLTRB(22, 24, 20, 20);
 
     return TextField(
       controller: controller,
@@ -352,25 +346,31 @@ class AppNumericBox extends StatelessWidget {
         errorText: errorText,
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest,
+        contentPadding: contentPadding,
         border: OutlineInputBorder(
           borderRadius: radius,
           borderSide: BorderSide(color: colorScheme.outlineVariant),
+          gapPadding: 10,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: radius,
           borderSide: BorderSide(color: colorScheme.outlineVariant),
+          gapPadding: 10,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: radius,
           borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          gapPadding: 10,
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: radius,
           borderSide: BorderSide(color: colorScheme.error),
+          gapPadding: 10,
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: radius,
           borderSide: BorderSide(color: colorScheme.error, width: 2),
+          gapPadding: 10,
         ),
       ),
       onChanged: onChanged,
