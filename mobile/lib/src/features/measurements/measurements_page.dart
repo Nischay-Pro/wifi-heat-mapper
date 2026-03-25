@@ -874,16 +874,6 @@ class MeasurementsView extends StatelessWidget {
                             selectedPoint?.label ??
                             'Choose a point on the floorplan',
                       ),
-                      AppInfoRow(
-                        label: 'Completed points',
-                        value: '${completedPointIds.length}',
-                      ),
-                      AppInfoRow(
-                        label: 'Point position',
-                        value: selectedPoint == null
-                            ? 'Not selected'
-                            : '${selectedPoint!.x}, ${selectedPoint!.y}',
-                      ),
                     ],
                   ),
               ],
