@@ -103,7 +103,7 @@ class InternetSpeedTestEngine {
           idleLatencyMs: idleLatency.latencyMs,
           idleJitterMs: idleLatency.jitterMs,
           idlePacketLossPercent: idleLatency.packetLossPercent,
-          downloadBps: download.transferP90Bps,
+          downloadBps: download.transferMeanBps,
           phaseLatencyMs: download.loadedLatency.latencyMs,
           phaseJitterMs: download.loadedLatency.jitterMs,
           phasePacketLossPercent: download.loadedLatency.packetLossPercent,
@@ -127,7 +127,7 @@ class InternetSpeedTestEngine {
         idleJitterMs: idleLatency.jitterMs,
         idlePacketLossPercent: idleLatency.packetLossPercent,
         streamCount: _streamCount,
-        downloadBps: download.transferP90Bps,
+        downloadBps: download.transferMeanBps,
         downloadElapsedMs: download.elapsedMs,
         downloadLoadedLatencyMs: download.loadedLatency.latencyMs,
         downloadLoadedJitterMs: download.loadedLatency.jitterMs,
@@ -135,7 +135,7 @@ class InternetSpeedTestEngine {
             download.loadedLatency.packetLossPercent,
         downloadSize: download.bytesTransferred.toDouble(),
         downloadSamplesBps: download.samplesBps,
-        uploadBps: upload.transferP90Bps,
+        uploadBps: upload.transferMeanBps,
         uploadElapsedMs: upload.elapsedMs,
         uploadLoadedLatencyMs: upload.loadedLatency.latencyMs,
         uploadLoadedJitterMs: upload.loadedLatency.jitterMs,
@@ -208,7 +208,7 @@ class InternetSpeedTestEngine {
         overallProgress: download.overallProgress,
         progress: 0,
         activeStageLabel: 'Measurement Lab upload',
-        downloadBps: download.transferP90Bps,
+        downloadBps: download.transferMeanBps,
         phaseLatencyMs: download.loadedLatency.latencyMs,
         phaseJitterMs: download.loadedLatency.jitterMs,
         streamCount: streamCount,
@@ -228,13 +228,13 @@ class InternetSpeedTestEngine {
     final result = InternetMeasurementResult(
       backend: 'measurement_lab',
       streamCount: streamCount,
-      downloadBps: download.transferP90Bps,
+      downloadBps: download.transferMeanBps,
       downloadElapsedMs: download.elapsedMs,
       downloadLoadedLatencyMs: download.loadedLatency.latencyMs,
       downloadLoadedJitterMs: download.loadedLatency.jitterMs,
       downloadSize: download.bytesTransferred.toDouble(),
       downloadSamplesBps: download.samplesBps,
-      uploadBps: upload.transferP90Bps,
+      uploadBps: upload.transferMeanBps,
       uploadElapsedMs: upload.elapsedMs,
       uploadLoadedLatencyMs: upload.loadedLatency.latencyMs,
       uploadLoadedJitterMs: upload.loadedLatency.jitterMs,
@@ -390,11 +390,10 @@ class InternetSpeedTestEngine {
               0.0,
               1.0,
             );
-        final previewSamples = [
-          ...existingDownloadSamples,
-          ...sampler.previewSamples,
-        ];
-        final previewBps = _percentile90(previewSamples);
+        final previewBps = _sustainedBps(
+          bytesTransferred: bytesTransferred,
+          elapsed: elapsed,
+        );
         onProgress(
           InternetSpeedTestProgress(
             phase: phase,
@@ -408,7 +407,7 @@ class InternetSpeedTestEngine {
                 : 'Measurement Lab upload',
             downloadBps: phase == InternetSpeedTestPhase.testingDownload
                 ? previewBps
-                : _percentile90(existingDownloadSamples),
+                : _meanBps(existingDownloadSamples),
             uploadBps: phase == InternetSpeedTestPhase.testingUpload
                 ? previewBps
                 : null,
@@ -533,7 +532,10 @@ class InternetSpeedTestEngine {
       return _TransferStats(
         bytesTransferred: bytesTransferred,
         elapsedMs: elapsed.inMilliseconds.toDouble(),
-        transferP90Bps: _percentile90(allSamples),
+        transferMeanBps: _sustainedBps(
+          bytesTransferred: bytesTransferred,
+          elapsed: elapsed,
+        ),
         overallProgress: (overallBase + overallWeight).clamp(0.0, 1.0),
         loadedLatency: loadedLatencyStats,
         samplesBps: List<double>.unmodifiable(allSamples),
@@ -669,10 +671,10 @@ class InternetSpeedTestEngine {
             idleJitterMs: idleLatency.jitterMs,
             idlePacketLossPercent: idleLatency.packetLossPercent,
             downloadBps: phase == InternetSpeedTestPhase.testingDownload
-                ? result.transferP90Bps
-                : _percentile90(existingDownloadSamples),
+                ? result.transferMeanBps
+                : _meanBps(existingDownloadSamples),
             uploadBps: phase == InternetSpeedTestPhase.testingUpload
-                ? result.transferP90Bps
+                ? result.transferMeanBps
                 : null,
             phaseLatencyMs: result.loadedLatency.latencyMs,
             phaseJitterMs: result.loadedLatency.jitterMs,
@@ -686,7 +688,10 @@ class InternetSpeedTestEngine {
     return _TransferStats(
       bytesTransferred: totalBytes,
       elapsedMs: totalElapsedMs,
-      transferP90Bps: _percentile90(stageSamples),
+      transferMeanBps: _sustainedBps(
+        bytesTransferred: totalBytes,
+        elapsedMs: totalElapsedMs,
+      ),
       overallProgress: _overallProgress(
         completedOverallBytes: phase == InternetSpeedTestPhase.testingDownload
             ? totalBytes
@@ -789,7 +794,7 @@ class InternetSpeedTestEngine {
               idleLatencyMs: idleLatency.latencyMs,
               idleJitterMs: idleLatency.jitterMs,
               idlePacketLossPercent: idleLatency.packetLossPercent,
-              downloadBps: _percentile90(previewSamples),
+              downloadBps: _meanBps(previewSamples),
               phaseLatencyMs: loadedLatencySamples.isEmpty
                   ? null
                   : loadedLatencySamples.last,
@@ -829,7 +834,10 @@ class InternetSpeedTestEngine {
     return _TransferStats(
       bytesTransferred: bytesTransferred,
       elapsedMs: stopwatch.elapsedMilliseconds.toDouble(),
-      transferP90Bps: _percentile90(allSamples),
+      transferMeanBps: _sustainedBps(
+        bytesTransferred: bytesTransferred,
+        elapsed: stopwatch.elapsed,
+      ),
       overallProgress: _overallProgress(
         completedOverallBytes: completedOverallBytes + bytesTransferred,
         totalOverallBytes: totalOverallBytes,
@@ -883,14 +891,28 @@ class InternetSpeedTestEngine {
     }
   }
 
-  double? _percentile90(List<double> values) {
+  double? _meanBps(List<double> values) {
     if (values.isEmpty) {
       return null;
     }
 
-    final sorted = [...values]..sort();
-    final rank = ((sorted.length - 1) * 0.9).ceil();
-    return sorted[rank.clamp(0, sorted.length - 1)];
+    final total = values.fold<double>(0, (sum, value) => sum + value);
+    return total / values.length;
+  }
+
+  double? _sustainedBps({
+    required int bytesTransferred,
+    Duration? elapsed,
+    double? elapsedMs,
+  }) {
+    final computedElapsedMs = elapsedMs ?? elapsed?.inMilliseconds.toDouble();
+    if (bytesTransferred <= 0 ||
+        computedElapsedMs == null ||
+        computedElapsedMs <= 0) {
+      return null;
+    }
+
+    return (bytesTransferred * 8 * 1000) / computedElapsedMs;
   }
 
   Future<_ResolvedBackend> _resolveBackend(
@@ -1198,7 +1220,7 @@ class _TransferStats {
   const _TransferStats({
     required this.bytesTransferred,
     required this.elapsedMs,
-    required this.transferP90Bps,
+    required this.transferMeanBps,
     required this.overallProgress,
     required this.loadedLatency,
     required this.samplesBps,
@@ -1206,7 +1228,7 @@ class _TransferStats {
 
   final int bytesTransferred;
   final double elapsedMs;
-  final double? transferP90Bps;
+  final double? transferMeanBps;
   final double overallProgress;
   final _LatencyStats loadedLatency;
   final List<double> samplesBps;
