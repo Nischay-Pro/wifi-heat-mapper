@@ -8,10 +8,10 @@ import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import io.flutter.plugin.common.EventChannel
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodChannel
-import java.io.File
 import java.net.NetworkInterface
 import java.net.SocketException
 import kotlin.math.roundToInt
@@ -19,6 +19,8 @@ import kotlin.math.roundToInt
 class MainActivity : FlutterActivity() {
     private val wifiMetadataChannelName = "wifi_metadata"
     private val iperfChannelName = "iperf_native"
+    private val iperfProgressChannelName = "iperf_native_progress"
+    private val measurementSessionChannelName = "measurement_session"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -45,18 +47,72 @@ class MainActivity : FlutterActivity() {
                         result.error("iperf_prepare_failed", error.message, null)
                     }
                 }
+                "runMeasurement" -> {
+                    val arguments = call.arguments as? Map<*, *>
+                    val host = arguments?.get("host") as? String
+                    val port = (arguments?.get("port") as? Number)?.toInt() ?: 5201
+                    val tcpDownload = arguments?.get("tcpDownloadEnabled") as? Boolean ?: false
+                    val tcpUpload = arguments?.get("tcpUploadEnabled") as? Boolean ?: false
+                    val udpDownload = arguments?.get("udpDownloadEnabled") as? Boolean ?: false
+                    val udpUpload = arguments?.get("udpUploadEnabled") as? Boolean ?: false
+
+                    IperfForegroundService.startMeasurement(
+                        context = applicationContext,
+                        host = host.orEmpty(),
+                        port = port,
+                        tcpDownload = tcpDownload,
+                        tcpUpload = tcpUpload,
+                        udpDownload = udpDownload,
+                        udpUpload = udpUpload,
+                        result = result,
+                    )
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            iperfProgressChannelName,
+        ).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    IperfServiceBridge.attachEventSink(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    IperfServiceBridge.attachEventSink(null)
+                }
+            },
+        )
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            measurementSessionChannelName,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> {
+                    val label = call.argument<String>("label") ?: "Preparing measurement"
+                    MeasurementSessionService.start(applicationContext, label)
+                    result.success(null)
+                }
+                "update" -> {
+                    val progress = call.argument<Int>("progress") ?: 0
+                    val label = call.argument<String>("label") ?: "Running measurement"
+                    MeasurementSessionService.update(applicationContext, progress, label)
+                    result.success(null)
+                }
+                "stop" -> {
+                    MeasurementSessionService.stop(applicationContext)
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
     }
 
     private fun prepareIperfExecutable(): String {
-        val source = File(applicationInfo.nativeLibraryDir, "libiperf_bundle.so")
-        require(source.exists()) {
-            "Bundled iperf binary is missing from nativeLibraryDir. " +
-                "Check android:extractNativeLibs/useLegacyPackaging."
-        }
-        return source.absolutePath
+        return IperfForegroundService.prepareIperfExecutable(applicationContext).absolutePath
     }
 
     private fun loadWifiMetadata(): Map<String, Any?> {

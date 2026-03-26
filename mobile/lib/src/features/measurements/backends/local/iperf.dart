@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:mobile/src/core/app_messages.dart';
@@ -13,21 +12,15 @@ class IperfBackend extends LocalMeasurementTest {
 
   final LocalMeasurementSettings settings;
   static const MethodChannel _channel = MethodChannel('iperf_native');
-  static const int _modeDurationSeconds = 10;
-  static const Duration _modeTimeout = Duration(seconds: 45);
+  static const EventChannel _progressChannel = EventChannel(
+    'iperf_native_progress',
+  );
 
   @override
   Future<InternetMeasurementResult?> recordLocalMeasurement({
     String? bindAddress,
     LocalMeasurementProgressCallback? onProgress,
   }) async {
-    final executablePath = await _channel.invokeMethod<String>(
-      'prepareExecutable',
-    );
-    if (executablePath == null || executablePath.isEmpty) {
-      throw StateError(AppMessages.intranetUnavailable);
-    }
-
     final configuredModes = <_IperfMode>[
       if (settings.modes.tcpDownloadEnabled)
         const _IperfMode.tcp(download: true),
@@ -43,79 +36,49 @@ class IperfBackend extends LocalMeasurementTest {
       return null;
     }
 
-    onProgress?.call(0, 'Preparing local test');
-    final results = <_IperfModeResult>[];
-    for (var index = 0; index < configuredModes.length; index++) {
-      final mode = configuredModes[index];
-      onProgress?.call(index / configuredModes.length, mode.label);
-      results.add(await _runMode(executablePath: executablePath, mode: mode));
-      onProgress?.call((index + 1) / configuredModes.length, mode.label);
-    }
+    final progressSubscription = _progressChannel
+        .receiveBroadcastStream()
+        .listen((event) {
+          if (onProgress == null || event is! Map) {
+            return;
+          }
 
-    return _aggregateResults(results);
-  }
+          final progress = switch (event['progress']) {
+            int value => value.toDouble(),
+            double value => value,
+            _ => 0.0,
+          };
+          final label = event['label']?.toString() ?? 'Local measurement';
+          onProgress(progress.clamp(0.0, 1.0), label);
+        });
 
-  Future<_IperfModeResult> _runMode({
-    required String executablePath,
-    required _IperfMode mode,
-  }) async {
-    final arguments = <String>[
-      '-c',
-      settings.serverHost!,
-      '-p',
-      settings.serverPort.toString(),
-      '-t',
-      _modeDurationSeconds.toString(),
-      '-J',
-      '--forceflush',
-      if (mode.download) '-R',
-      if (mode.protocol == _IperfProtocol.udp) '-u',
-    ];
+    try {
+      final rawResults = await _channel
+          .invokeListMethod<dynamic>('runMeasurement', {
+            'host': settings.serverHost,
+            'port': settings.serverPort,
+            'tcpDownloadEnabled': settings.modes.tcpDownloadEnabled,
+            'tcpUploadEnabled': settings.modes.tcpUploadEnabled,
+            'udpDownloadEnabled': settings.modes.udpDownloadEnabled,
+            'udpUploadEnabled': settings.modes.udpUploadEnabled,
+          });
 
-    final process = await Process.start(executablePath, arguments);
-    final stdoutFuture = process.stdout.transform(utf8.decoder).join();
-    final stderrFuture = process.stderr.transform(utf8.decoder).join();
-    final exitCode = await process.exitCode.timeout(
-      _modeTimeout,
-      onTimeout: () {
-        process.kill(ProcessSignal.sigkill);
-        throw TimeoutException(
-          'iperf3 ${mode.label} timed out after ${_modeTimeout.inSeconds} seconds.',
-        );
-      },
-    );
-    final stdoutText = await stdoutFuture;
-    final stderrText = await stderrFuture;
-
-    Map<String, dynamic>? decodedJson;
-    if (stdoutText.trim().isNotEmpty) {
-      final decoded = jsonDecode(stdoutText);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('iperf3 output was not a JSON object.');
+      if (rawResults == null || rawResults.isEmpty) {
+        return null;
       }
-      decodedJson = decoded;
+
+      final results = rawResults.map(_decodeModeResult).toList(growable: false);
+      return _aggregateResults(results);
+    } on PlatformException catch (error) {
+      final message = error.message?.trim();
+      throw StateError(
+        message == null || message.isEmpty
+            ? AppMessages.intranetUnavailable
+            : message,
+      );
+    } finally {
+      await progressSubscription.cancel();
     }
-
-    final iperfError = decodedJson == null
-        ? null
-        : _jsonString(decodedJson['error']);
-
-    if (exitCode != 0 || iperfError != null) {
-      final message =
-          iperfError ??
-          (stderrText.trim().isNotEmpty
-              ? stderrText.trim()
-              : stdoutText.trim().isNotEmpty
-              ? stdoutText.trim()
-              : 'iperf3 exited with code $exitCode.');
-      throw StateError(message);
-    }
-
-    if (decodedJson == null) {
-      throw const FormatException('iperf3 did not return JSON output.');
-    }
-
-    return _IperfModeResult(mode: mode, json: decodedJson);
   }
 
   InternetMeasurementResult _aggregateResults(List<_IperfModeResult> results) {
@@ -169,6 +132,37 @@ class IperfBackend extends LocalMeasurementTest {
       streamCount: 1,
     );
   }
+}
+
+_IperfModeResult _decodeModeResult(dynamic value) {
+  if (value is! Map) {
+    throw const FormatException('iperf3 mode result was malformed.');
+  }
+
+  final protocolValue = value['protocol']?.toString();
+  final downloadValue = value['download'];
+  final jsonText = value['json']?.toString();
+  if (protocolValue == null || jsonText == null || downloadValue is! bool) {
+    throw const FormatException('iperf3 mode result is missing fields.');
+  }
+
+  final decoded = jsonDecode(jsonText);
+  if (decoded is! Map<String, dynamic>) {
+    throw const FormatException('iperf3 output was not a JSON object.');
+  }
+
+  final mode = switch (protocolValue) {
+    'tcp' => _IperfMode.tcp(download: downloadValue),
+    'udp' => _IperfMode.udp(download: downloadValue),
+    _ => throw const FormatException('iperf3 protocol is unsupported.'),
+  };
+
+  final iperfError = _jsonString(decoded['error']);
+  if (iperfError != null) {
+    throw StateError(iperfError);
+  }
+
+  return _IperfModeResult(mode: mode, json: decoded);
 }
 
 String? _jsonString(Object? value) {

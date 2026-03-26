@@ -11,6 +11,7 @@ import 'package:mobile/src/core/loading_indicator.dart';
 import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
+import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_service.dart';
 import 'package:mobile/src/features/measurements/local_measurement_service.dart';
 import 'package:mobile/src/features/measurements/measurement_scope_controller.dart';
@@ -22,6 +23,7 @@ import 'package:mobile/src/models/site_point.dart';
 import 'package:mobile/src/models/wifi_metadata.dart';
 import 'package:mobile/src/services/device_identity_service.dart';
 import 'package:mobile/src/services/server_api.dart';
+import 'package:mobile/src/storage/app_preferences.dart';
 
 class MeasurementsPage extends ConsumerStatefulWidget {
   const MeasurementsPage({
@@ -41,6 +43,9 @@ class MeasurementsPage extends ConsumerStatefulWidget {
 
 class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     with WidgetsBindingObserver {
+  static const MethodChannel _measurementSessionChannel = MethodChannel(
+    'measurement_session',
+  );
   static const double _localMeasurementWeight = 0.3;
   static const double _internetMeasurementWeight = 0.6;
   static const double _uploadWeight = 0.1;
@@ -445,10 +450,22 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       );
     });
 
+    final measurementScope = ref.read(measurementScopeControllerProvider);
+    final internetSettings = ref.read(
+      internetSpeedTestSettingsControllerProvider,
+    );
+    final shouldRunLocal = measurementScope.includesLocal;
+    final shouldRunInternet = measurementScope.includesInternet;
+
     try {
-      final measurementScope = ref.read(measurementScopeControllerProvider);
-      final shouldRunLocal = measurementScope.includesLocal;
-      final shouldRunInternet = measurementScope.includesInternet;
+      await _startMeasurementSessionNotification(
+        _measurementNotificationLabel(
+          backend: shouldRunLocal
+              ? 'iPerf3'
+              : _internetNotificationBackendLabel(internetSettings),
+          test: shouldRunLocal ? 'Preparing' : 'Preparing',
+        ),
+      );
       final totalWeight =
           (shouldRunLocal ? _localMeasurementWeight : 0) +
           (shouldRunInternet ? _internetMeasurementWeight : 0) +
@@ -489,6 +506,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
                       ),
                     );
                   });
+                  _updateMeasurementSessionNotification(
+                    progress: _displayedOverallProgress,
+                    label: _measurementNotificationLabel(
+                      backend: 'iPerf3',
+                      test: _formatNotificationTestLabel(activeStageLabel),
+                    ),
+                  );
                 },
               );
         } on StateError catch (error) {
@@ -507,6 +531,18 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
             localWeight,
           );
         });
+        await _updateMeasurementSessionNotification(
+          progress: _displayedOverallProgress,
+          label: shouldRunInternet
+              ? _measurementNotificationLabel(
+                  backend: _internetNotificationBackendLabel(internetSettings),
+                  test: 'Preparing',
+                )
+              : _measurementNotificationLabel(
+                  backend: 'Upload',
+                  test: 'Uploading',
+                ),
+        );
       }
 
       if (shouldRunInternet) {
@@ -525,6 +561,15 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
                     localWeight + (progress.overallProgress * internetWeight),
                   );
                 });
+                _updateMeasurementSessionNotification(
+                  progress: _displayedOverallProgress,
+                  label: _measurementNotificationLabel(
+                    backend: _internetNotificationBackendLabel(
+                      internetSettings,
+                    ),
+                    test: _internetNotificationTestLabel(progress),
+                  ),
+                );
               },
             );
       }
@@ -563,6 +608,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
             );
           });
         }
+        await _updateMeasurementSessionNotification(
+          progress: _displayedOverallProgress,
+          label: _measurementNotificationLabel(
+            backend: 'Upload',
+            test: 'Uploading',
+          ),
+        );
 
         final deviceIdentity = await ref
             .read(deviceIdentityServiceProvider)
@@ -593,6 +645,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               ? AppMessages.measurementUploaded
               : '${AppMessages.measurementUploaded} $localMeasurementNotice';
         });
+        await _updateMeasurementSessionNotification(
+          progress: 1,
+          label: _measurementNotificationLabel(
+            backend: 'Measurement',
+            test: 'Complete',
+          ),
+        );
         return;
       } on ApiException catch (error) {
         if (!mounted) {
@@ -611,6 +670,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               ? AppMessages.pointNoLongerExists
               : 'Measurement captured, but upload failed: ${error.message}';
         });
+        await _updateMeasurementSessionNotification(
+          progress: 1,
+          label: _measurementNotificationLabel(
+            backend: 'Upload',
+            test: 'Failed',
+          ),
+        );
         return;
       } on SocketException catch (error) {
         if (!mounted) {
@@ -624,6 +690,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _measurementSubmissionMessage =
               'Measurement captured, but the server upload could not be completed: ${error.message}.';
         });
+        await _updateMeasurementSessionNotification(
+          progress: 1,
+          label: _measurementNotificationLabel(
+            backend: 'Upload',
+            test: 'Failed',
+          ),
+        );
         return;
       } catch (error) {
         if (!mounted) {
@@ -637,6 +710,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _measurementSubmissionMessage =
               'Measurement captured, but upload failed: $error';
         });
+        await _updateMeasurementSessionNotification(
+          progress: 1,
+          label: _measurementNotificationLabel(
+            backend: 'Upload',
+            test: 'Failed',
+          ),
+        );
         return;
       }
     } on SocketException catch (error) {
@@ -656,6 +736,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      await _updateMeasurementSessionNotification(
+        progress: _displayedOverallProgress,
+        label: _measurementNotificationLabel(
+          backend: _internetNotificationBackendLabel(internetSettings),
+          test: 'Failed',
+        ),
+      );
     } on HttpException catch (error) {
       if (!mounted) {
         return;
@@ -672,6 +759,13 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      await _updateMeasurementSessionNotification(
+        progress: _displayedOverallProgress,
+        label: _measurementNotificationLabel(
+          backend: _internetNotificationBackendLabel(internetSettings),
+          test: 'Failed',
+        ),
+      );
     } on StateError catch (error) {
       if (!mounted) {
         return;
@@ -688,6 +782,15 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      await _updateMeasurementSessionNotification(
+        progress: _displayedOverallProgress,
+        label: _measurementNotificationLabel(
+          backend: shouldRunLocal && !shouldRunInternet
+              ? 'iPerf3'
+              : _internetNotificationBackendLabel(internetSettings),
+          test: 'Failed',
+        ),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -704,7 +807,113 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      await _updateMeasurementSessionNotification(
+        progress: _displayedOverallProgress,
+        label: _measurementNotificationLabel(
+          backend: shouldRunLocal && !shouldRunInternet
+              ? 'iPerf3'
+              : _internetNotificationBackendLabel(internetSettings),
+          test: 'Failed',
+        ),
+      );
+    } finally {
+      await _stopMeasurementSessionNotification();
     }
+  }
+
+  Future<void> _startMeasurementSessionNotification(String label) async {
+    try {
+      await _measurementSessionChannel.invokeMethod<void>('start', {
+        'label': label,
+      });
+    } on MissingPluginException {
+      // Ignore on unsupported platforms.
+    } on PlatformException {
+      // Ignore notification failures and keep the measurement running.
+    }
+  }
+
+  Future<void> _updateMeasurementSessionNotification({
+    required double progress,
+    required String label,
+  }) async {
+    try {
+      await _measurementSessionChannel.invokeMethod<void>('update', {
+        'progress': (progress.clamp(0.0, 1.0) * 100).round(),
+        'label': label,
+      });
+    } on MissingPluginException {
+      // Ignore on unsupported platforms.
+    } on PlatformException {
+      // Ignore notification failures and keep the measurement running.
+    }
+  }
+
+  Future<void> _stopMeasurementSessionNotification() async {
+    try {
+      await _measurementSessionChannel.invokeMethod<void>('stop');
+    } on MissingPluginException {
+      // Ignore on unsupported platforms.
+    } on PlatformException {
+      // Ignore notification failures and keep the measurement running.
+    }
+  }
+
+  String _measurementNotificationLabel({
+    required String backend,
+    required String test,
+  }) {
+    return 'Running $backend $test'.trim();
+  }
+
+  String _internetNotificationBackendLabel(InternetSpeedTestSettings settings) {
+    return switch (settings.backend) {
+      InternetSpeedTestBackendPreference.publicLibrespeed =>
+        'Public Librespeed',
+      InternetSpeedTestBackendPreference.customLibrespeed =>
+        'Custom Librespeed',
+      InternetSpeedTestBackendPreference.cloudflare => 'Cloudflare',
+      InternetSpeedTestBackendPreference.measurementLab => 'Measurement Lab',
+    };
+  }
+
+  String _internetNotificationTestLabel(InternetSpeedTestProgress progress) {
+    final activeStageLabel = progress.activeStageLabel?.trim();
+    if (activeStageLabel != null && activeStageLabel.isNotEmpty) {
+      return _formatNotificationTestLabel(activeStageLabel);
+    }
+
+    return switch (progress.phase) {
+      InternetSpeedTestPhase.measuringLatency => 'Jitter',
+      InternetSpeedTestPhase.testingDownload => 'Download',
+      InternetSpeedTestPhase.testingUpload => 'Upload',
+      InternetSpeedTestPhase.completed => 'Complete',
+      InternetSpeedTestPhase.failed => 'Failed',
+      InternetSpeedTestPhase.idle => 'Preparing',
+    };
+  }
+
+  String _formatNotificationTestLabel(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return 'Preparing';
+    }
+
+    final normalized = trimmed
+        .replaceAll('Measurement Lab ', '')
+        .replaceAll('measurement lab ', '')
+        .replaceAll(' download', ' Download')
+        .replaceAll(' upload', ' Upload')
+        .replaceAll('latency', 'Jitter');
+
+    return normalized
+        .split(RegExp(r'\s+'))
+        .map(
+          (part) => part.isEmpty
+              ? part
+              : '${part[0].toUpperCase()}${part.substring(1)}',
+        )
+        .join(' ');
   }
 
   String _formatLocalMeasurementNotice(String message) {

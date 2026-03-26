@@ -7,15 +7,12 @@ import 'package:mobile/src/features/permissions/wifi_permission_models.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 final wifiPermissionServiceProvider = Provider<WifiPermissionService>((ref) {
-  return WifiPermissionService(
-    deviceInfoPlugin: DeviceInfoPlugin(),
-  );
+  return WifiPermissionService(deviceInfoPlugin: DeviceInfoPlugin());
 });
 
 class WifiPermissionService {
-  WifiPermissionService({
-    required DeviceInfoPlugin deviceInfoPlugin,
-  }) : _deviceInfoPlugin = deviceInfoPlugin;
+  WifiPermissionService({required DeviceInfoPlugin deviceInfoPlugin})
+    : _deviceInfoPlugin = deviceInfoPlugin;
 
   final DeviceInfoPlugin _deviceInfoPlugin;
 
@@ -52,6 +49,11 @@ class WifiPermissionService {
   Future<List<WifiPermissionRequirement>> _loadAndroidRequirements() async {
     final androidInfo = await _deviceInfoPlugin.androidInfo;
     final requirements = <WifiPermissionRequirement>[
+      if (androidInfo.version.sdkInt >= 33)
+        await _buildNotificationPermissionRequirement(
+          summary:
+              'Needed on Android 13+ so background measurement progress can stay visible in the notification panel.',
+        ),
       await _buildLocationPermissionRequirement(
         summary:
             'Needed to read SSID, BSSID, RSSI, and Wi-Fi data that Android treats as location-sensitive.',
@@ -95,6 +97,18 @@ class WifiPermissionService {
     return _buildRuntimeRequirement(
       id: 'nearby_wifi_devices',
       title: 'Nearby Wi-Fi devices',
+      summary: summary,
+      status: status,
+    );
+  }
+
+  Future<WifiPermissionRequirement> _buildNotificationPermissionRequirement({
+    required String summary,
+  }) async {
+    final status = await Permission.notification.status;
+    return _buildRuntimeRequirement(
+      id: 'notification_permission',
+      title: 'Notifications',
       summary: summary,
       status: status,
     );
@@ -177,10 +191,15 @@ class WifiPermissionService {
 
   Future<void> _requestPermission(String id) async {
     switch (id) {
+      case 'notification_permission':
+        await Permission.notification.request();
+        return;
       case 'nearby_wifi_devices':
         await Permission.nearbyWifiDevices.request();
+        return;
       case 'location_permission':
         await Permission.locationWhenInUse.request();
+        return;
       default:
         return;
     }
