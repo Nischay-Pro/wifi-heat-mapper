@@ -403,7 +403,7 @@ class _SettingsTab extends ConsumerWidget {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const _MeasurementModeSettingsPage(),
+                    builder: (_) => const MeasurementModeSettingsPage(),
                   ),
                 );
               },
@@ -414,7 +414,7 @@ class _SettingsTab extends ConsumerWidget {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const _InternetSettingsPage(),
+                    builder: (_) => const InternetSettingsPage(),
                   ),
                 );
               },
@@ -425,7 +425,7 @@ class _SettingsTab extends ConsumerWidget {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => const _IntranetSettingsPage(),
+                    builder: (_) => const LocalMeasurementsSettingsPage(),
                   ),
                 );
               },
@@ -484,8 +484,8 @@ String _measurementScopeLabel(MeasurementScopePreference scope) {
   };
 }
 
-class _InternetSettingsPage extends ConsumerWidget {
-  const _InternetSettingsPage();
+class InternetSettingsPage extends ConsumerWidget {
+  const InternetSettingsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -648,8 +648,8 @@ class _InternetSettingsPage extends ConsumerWidget {
   }
 }
 
-class _MeasurementModeSettingsPage extends ConsumerWidget {
-  const _MeasurementModeSettingsPage();
+class MeasurementModeSettingsPage extends ConsumerWidget {
+  const MeasurementModeSettingsPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -759,15 +759,16 @@ class _UiSettingsPage extends ConsumerWidget {
   }
 }
 
-class _IntranetSettingsPage extends ConsumerStatefulWidget {
-  const _IntranetSettingsPage();
+class LocalMeasurementsSettingsPage extends ConsumerStatefulWidget {
+  const LocalMeasurementsSettingsPage({super.key});
 
   @override
-  ConsumerState<_IntranetSettingsPage> createState() =>
-      _IntranetSettingsPageState();
+  ConsumerState<LocalMeasurementsSettingsPage> createState() =>
+      _LocalMeasurementsSettingsPageState();
 }
 
-class _IntranetSettingsPageState extends ConsumerState<_IntranetSettingsPage> {
+class _LocalMeasurementsSettingsPageState
+    extends ConsumerState<LocalMeasurementsSettingsPage> {
   late final TextEditingController _hostController;
   late final TextEditingController _portController;
   String? _errorMessage;

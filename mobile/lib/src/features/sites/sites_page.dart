@@ -10,6 +10,8 @@ import 'package:mobile/src/features/app_shell/site_shell_page.dart';
 import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
+import 'package:mobile/src/features/measurements/measurement_setup_controller.dart';
+import 'package:mobile/src/features/measurements/measurement_setup_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
 import 'package:mobile/src/models/site_summary.dart';
@@ -129,12 +131,21 @@ class _SitesPageState extends ConsumerState<SitesPage>
         }
 
         if (requirementsMet) {
+          final setupStatus = ref.read(measurementSetupStatusProvider);
           await Navigator.of(context).push(
             platformPageRoute<void>(
-              SiteShellPage(
-                selectedSiteSlug: connectionState.selectedSiteSlug!,
+              setupStatus.isComplete
+                  ? SiteShellPage(
+                      selectedSiteSlug: connectionState.selectedSiteSlug!,
+                    )
+                  : MeasurementSetupPage(
+                      selectedSiteSlug: connectionState.selectedSiteSlug!,
+                    ),
+              settings: RouteSettings(
+                name: setupStatus.isComplete
+                    ? siteShellRouteName
+                    : 'measurement-setup',
               ),
-              settings: const RouteSettings(name: siteShellRouteName),
             ),
           );
           return;

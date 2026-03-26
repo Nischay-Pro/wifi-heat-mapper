@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/mobile.dart';
 import 'package:mobile/src/features/connect/server_connection_state.dart';
+import 'package:mobile/src/features/measurements/measurement_setup_page.dart';
 import 'package:mobile/src/features/sites/sites_page.dart';
 import 'package:mobile/src/models/site_detail.dart';
 import 'package:mobile/src/storage/app_preferences.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   const serverApi = ServerApi();
@@ -251,5 +254,34 @@ void main() {
         expect(find.text('Selected site: default'), findsNothing);
       },
     );
+  });
+
+  group('MeasurementSetupPage', () {
+    testWidgets('shows the measurement setup checklist', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
+          child: MaterialApp(
+            theme: ThemeData(useMaterial3: true),
+            home: const MeasurementSetupPage(selectedSiteSlug: 'default'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Measurement setup'), findsOneWidget);
+      expect(find.text('Finish measurement setup'), findsOneWidget);
+      expect(find.text('Measurement mode'), findsOneWidget);
+      expect(
+        find.text(
+          'Complete the items below before starting measurements for this device.',
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }

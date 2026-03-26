@@ -6,6 +6,8 @@ import 'package:mobile/src/core/ui/app_tokens.dart';
 import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/app_shell/site_shell_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
+import 'package:mobile/src/features/measurements/measurement_setup_controller.dart';
+import 'package:mobile/src/features/measurements/measurement_setup_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
 import 'package:mobile/src/features/sites/sites_page.dart';
@@ -70,17 +72,22 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
     }
 
     final connectionState = ref.read(serverConnectionControllerProvider);
-    if (!connectionState.isConnected || connectionState.selectedSiteSlug == null) {
+    if (!connectionState.isConnected ||
+        connectionState.selectedSiteSlug == null) {
       setState(() {
         _isAttemptingAutoResume = false;
       });
       return;
     }
 
-    final requirementsMet = await ref.read(wifiPermissionServiceProvider).areRequirementsMet();
+    final requirementsMet = await ref
+        .read(wifiPermissionServiceProvider)
+        .areRequirementsMet();
     if (!mounted) {
       return;
     }
+
+    final setupStatus = ref.read(measurementSetupStatusProvider);
 
     if (!requirementsMet) {
       await Navigator.of(context).pushReplacement(
@@ -94,8 +101,16 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
 
     await Navigator.of(context).pushReplacement(
       platformPageRoute<void>(
-        SiteShellPage(selectedSiteSlug: connectionState.selectedSiteSlug!),
-        settings: const RouteSettings(name: siteShellRouteName),
+        setupStatus.isComplete
+            ? SiteShellPage(selectedSiteSlug: connectionState.selectedSiteSlug!)
+            : MeasurementSetupPage(
+                selectedSiteSlug: connectionState.selectedSiteSlug!,
+              ),
+        settings: RouteSettings(
+          name: setupStatus.isComplete
+              ? siteShellRouteName
+              : 'measurement-setup',
+        ),
       ),
     );
   }
@@ -134,9 +149,7 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('WHM Mobile'),
-      ),
+      appBar: AppBar(title: const Text('WHM Mobile')),
       body: SafeArea(
         child: AppPage(
           children: [
@@ -161,7 +174,9 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
                   ),
                   SizedBox(height: tokens.spacing.regular),
                   FilledButton(
-                    onPressed: connectionState.isConnecting ? null : _handleConnect,
+                    onPressed: connectionState.isConnecting
+                        ? null
+                        : _handleConnect,
                     child: connectionState.isConnecting
                         ? const LoadingIndicator.small()
                         : const Text('Connect'),
@@ -177,7 +192,9 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
             if (connectionState.statusMessage != null) ...[
               SizedBox(height: tokens.sectionGap),
               AppBanner(
-                icon: connectionState.hasError ? Icons.error_outline : Icons.info_outline,
+                icon: connectionState.hasError
+                    ? Icons.error_outline
+                    : Icons.info_outline,
                 message: connectionState.statusMessage!,
                 iconColor: connectionState.hasError
                     ? Theme.of(context).colorScheme.error
@@ -192,9 +209,7 @@ class _ServerConnectPageState extends ConsumerState<ServerConnectPage> {
 }
 
 class _ServerBootstrapView extends StatelessWidget {
-  const _ServerBootstrapView({
-    required this.savedSiteSlug,
-  });
+  const _ServerBootstrapView({required this.savedSiteSlug});
 
   final String savedSiteSlug;
 
@@ -203,8 +218,12 @@ class _ServerBootstrapView extends StatelessWidget {
     final tokens = AppTokens.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final placeholder = isDark ? const Color(0xFF24282E) : const Color(0xFFE1E6EE);
-    final placeholderSoft = isDark ? const Color(0xFF1D2025) : const Color(0xFFF0F3F7);
+    final placeholder = isDark
+        ? const Color(0xFF24282E)
+        : const Color(0xFFE1E6EE);
+    final placeholderSoft = isDark
+        ? const Color(0xFF1D2025)
+        : const Color(0xFFF0F3F7);
 
     Widget block({
       required double height,
@@ -222,9 +241,7 @@ class _ServerBootstrapView extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('WHM Mobile'),
-      ),
+      appBar: AppBar(title: const Text('WHM Mobile')),
       body: SafeArea(
         child: AppPage(
           children: [
@@ -245,10 +262,7 @@ class _ServerBootstrapView extends StatelessWidget {
                             color: colorScheme.primary.withValues(alpha: 0.18),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                            Icons.bolt,
-                            color: colorScheme.primary,
-                          ),
+                          child: Icon(Icons.bolt, color: colorScheme.primary),
                         ),
                         SizedBox(width: tokens.spacing.compact),
                         Expanded(
@@ -256,9 +270,8 @@ class _ServerBootstrapView extends StatelessWidget {
                             savedSiteSlug,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
                         Icon(
@@ -282,11 +295,17 @@ class _ServerBootstrapView extends StatelessWidget {
             SizedBox(height: tokens.spacing.regular),
             Row(
               children: [
-                Expanded(child: block(height: 76, radius: BorderRadius.circular(24))),
+                Expanded(
+                  child: block(height: 76, radius: BorderRadius.circular(24)),
+                ),
                 SizedBox(width: tokens.spacing.compact),
-                Expanded(child: block(height: 76, radius: BorderRadius.circular(24))),
+                Expanded(
+                  child: block(height: 76, radius: BorderRadius.circular(24)),
+                ),
                 SizedBox(width: tokens.spacing.compact),
-                Expanded(child: block(height: 76, radius: BorderRadius.circular(24))),
+                Expanded(
+                  child: block(height: 76, radius: BorderRadius.circular(24)),
+                ),
               ],
             ),
             SizedBox(height: tokens.spacing.regular),
@@ -322,8 +341,8 @@ class _ServerBootstrapView extends StatelessWidget {
                   Text(
                     'Loading measurement activity...',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
