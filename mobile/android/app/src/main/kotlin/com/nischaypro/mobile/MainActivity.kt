@@ -3,6 +3,8 @@ package com.nischaypro.mobile
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
@@ -21,6 +23,7 @@ class MainActivity : FlutterActivity() {
     private val iperfChannelName = "iperf_native"
     private val iperfProgressChannelName = "iperf_native_progress"
     private val measurementSessionChannelName = "measurement_session"
+    private val measurementChimeChannelName = "measurement_chime"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -107,6 +110,37 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            measurementChimeChannelName,
+        ).setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "playSuccess" -> {
+                        playNotificationTone(
+                            toneType = ToneGenerator.TONE_PROP_BEEP,
+                            durationMs = 110,
+                        )
+                        result.success(null)
+                    }
+
+                    "playFailure" -> {
+                        playNotificationToneSequence(
+                            steps = listOf(
+                                ToneStep(ToneGenerator.TONE_PROP_BEEP2, 110, 0),
+                                ToneStep(ToneGenerator.TONE_PROP_BEEP2, 110, 170),
+                            ),
+                        )
+                        result.success(null)
+                    }
+
+                    else -> result.notImplemented()
+                }
+            } catch (error: Throwable) {
+                result.error("measurement_chime_failed", error.message, null)
             }
         }
     }
@@ -238,4 +272,40 @@ class MainActivity : FlutterActivity() {
             null
         }
     }
+
+    private fun playNotificationTone(toneType: Int, durationMs: Int) {
+        val generator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 65)
+        try {
+            generator.startTone(toneType, durationMs)
+            Thread.sleep((durationMs + 40).toLong())
+        } finally {
+            generator.release()
+        }
+    }
+
+    private fun playNotificationToneSequence(steps: List<ToneStep>) {
+        Thread {
+            val generator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 65)
+            try {
+                var elapsedDelayMs = 0
+                for (step in steps) {
+                    val waitMs = step.delayMs - elapsedDelayMs
+                    if (waitMs > 0) {
+                        Thread.sleep(waitMs.toLong())
+                    }
+                    generator.startTone(step.toneType, step.durationMs)
+                    Thread.sleep((step.durationMs + 40).toLong())
+                    elapsedDelayMs = step.delayMs + step.durationMs + 40
+                }
+            } finally {
+                generator.release()
+            }
+        }.start()
+    }
+
+    private data class ToneStep(
+        val toneType: Int,
+        val durationMs: Int,
+        val delayMs: Int,
+    )
 }

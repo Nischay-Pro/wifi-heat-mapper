@@ -11,6 +11,7 @@ import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
 import 'package:mobile/src/features/measurements/local_measurement_settings_controller.dart';
+import 'package:mobile/src/features/measurements/measurement_chime_controller.dart';
 import 'package:mobile/src/features/measurements/measurement_scope_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
@@ -450,6 +451,25 @@ class _SettingsTab extends ConsumerWidget {
           ],
         ),
         SizedBox(height: tokens.sectionGap),
+        const AppSectionLabel(label: 'Notifications'),
+        SizedBox(height: tokens.spacing.compact),
+        AppSettingsGroup(
+          flat: true,
+          children: [
+            AppSettingsRow(
+              title: 'Sound',
+              subtitle: 'Notification chime',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const _NotificationsSettingsPage(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        SizedBox(height: tokens.sectionGap),
         const AppSectionLabel(label: 'Connection'),
         SizedBox(height: tokens.spacing.compact),
         AppSettingsGroup(
@@ -751,6 +771,46 @@ class _UiSettingsPage extends ConsumerWidget {
                       themeController.setPreference(AppThemePreference.dark),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationsSettingsPage extends ConsumerWidget {
+  const _NotificationsSettingsPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = AppTokens.of(context);
+    final measurementChimeEnabled = ref.watch(
+      measurementChimeControllerProvider,
+    );
+    final measurementChimeController = ref.read(
+      measurementChimeControllerProvider.notifier,
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notifications')),
+      body: SafeArea(
+        child: AppPage(
+          children: [
+            const AppSectionLabel(label: 'Sound'),
+            SizedBox(height: tokens.spacing.compact),
+            const AppSectionNote(message: 'Notification chime'),
+            SizedBox(height: tokens.sectionGap),
+            AppPanel(
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Measurement chime'),
+                subtitle: const Text(
+                  'Play a chime when a measurement completes or fails.',
+                ),
+                value: measurementChimeEnabled,
+                onChanged: measurementChimeController.setEnabled,
+              ),
             ),
           ],
         ),

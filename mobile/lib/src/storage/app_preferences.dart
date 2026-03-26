@@ -76,6 +76,7 @@ class AppPreferences {
   static const selectedSiteSlugKey = 'selected_site_slug';
   static const deviceSlugKey = 'device_slug';
   static const themePreferenceKey = 'theme_preference';
+  static const measurementChimeEnabledKey = 'measurement_chime_enabled';
   static const internetSpeedTestBackendKey = 'internet_speed_test_backend';
   static const measurementScopeKey = 'measurement_scope';
   static const customLibrespeedUrlKey = 'custom_librespeed_url';
@@ -107,6 +108,9 @@ class AppPreferences {
   AppThemePreference getThemePreference() => AppThemePreference.fromStorage(
     _preferences.getString(themePreferenceKey),
   );
+
+  bool getMeasurementChimeEnabled() =>
+      _preferences.getBool(measurementChimeEnabledKey) ?? false;
 
   InternetSpeedTestBackendPreference getInternetSpeedTestBackendPreference() =>
       InternetSpeedTestBackendPreference.fromStorage(
@@ -167,6 +171,9 @@ class AppPreferences {
 
   Future<bool> setThemePreference(AppThemePreference value) =>
       _preferences.setString(themePreferenceKey, value.storageValue);
+
+  Future<bool> setMeasurementChimeEnabled(bool value) =>
+      _preferences.setBool(measurementChimeEnabledKey, value);
 
   Future<bool> setInternetSpeedTestBackendPreference(
     InternetSpeedTestBackendPreference value,

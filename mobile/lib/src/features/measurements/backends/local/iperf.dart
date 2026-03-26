@@ -70,7 +70,7 @@ class IperfBackend extends LocalMeasurementTest {
       final results = rawResults.map(_decodeModeResult).toList(growable: false);
       return _aggregateResults(results);
     } on PlatformException catch (error) {
-      final message = error.message?.trim();
+      final message = _normalizeIperfError(error.message);
       throw StateError(
         message == null || message.isEmpty
             ? AppMessages.intranetUnavailable
@@ -159,10 +159,38 @@ _IperfModeResult _decodeModeResult(dynamic value) {
 
   final iperfError = _jsonString(decoded['error']);
   if (iperfError != null) {
-    throw StateError(iperfError);
+    throw StateError(_normalizeIperfError(iperfError) ?? iperfError);
   }
 
   return _IperfModeResult(mode: mode, json: decoded);
+}
+
+String? _normalizeIperfError(String? rawMessage) {
+  final trimmed = rawMessage?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+
+  final decoded = _tryDecodeJsonObject(trimmed);
+  final jsonError = decoded == null ? null : _jsonString(decoded['error']);
+  if (jsonError != null) {
+    return jsonError;
+  }
+
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return AppMessages.intranetServerConnectionFailed;
+  }
+
+  return trimmed;
+}
+
+Map<String, dynamic>? _tryDecodeJsonObject(String value) {
+  try {
+    final decoded = jsonDecode(value);
+    return decoded is Map<String, dynamic> ? decoded : null;
+  } on FormatException {
+    return null;
+  }
 }
 
 String? _jsonString(Object? value) {

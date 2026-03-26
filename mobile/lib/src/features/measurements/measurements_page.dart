@@ -14,6 +14,7 @@ import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_service.dart';
 import 'package:mobile/src/features/measurements/local_measurement_service.dart';
+import 'package:mobile/src/features/measurements/measurement_chime_controller.dart';
 import 'package:mobile/src/features/measurements/measurement_scope_controller.dart';
 import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/floor_map.dart';
@@ -45,6 +46,9 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     with WidgetsBindingObserver {
   static const MethodChannel _measurementSessionChannel = MethodChannel(
     'measurement_session',
+  );
+  static const MethodChannel _measurementChimeChannel = MethodChannel(
+    'measurement_chime',
   );
   static const double _localMeasurementWeight = 0.3;
   static const double _internetMeasurementWeight = 0.6;
@@ -645,6 +649,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               ? AppMessages.measurementUploaded
               : '${AppMessages.measurementUploaded} $localMeasurementNotice';
         });
+        unawaited(_playMeasurementCompletedChime());
         await _updateMeasurementSessionNotification(
           progress: 1,
           label: _measurementNotificationLabel(
@@ -670,6 +675,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               ? AppMessages.pointNoLongerExists
               : 'Measurement captured, but upload failed: ${error.message}';
         });
+        unawaited(_playMeasurementFailedChime());
         await _updateMeasurementSessionNotification(
           progress: 1,
           label: _measurementNotificationLabel(
@@ -690,6 +696,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _measurementSubmissionMessage =
               'Measurement captured, but the server upload could not be completed: ${error.message}.';
         });
+        unawaited(_playMeasurementFailedChime());
         await _updateMeasurementSessionNotification(
           progress: 1,
           label: _measurementNotificationLabel(
@@ -710,6 +717,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           _measurementSubmissionMessage =
               'Measurement captured, but upload failed: $error';
         });
+        unawaited(_playMeasurementFailedChime());
         await _updateMeasurementSessionNotification(
           progress: 1,
           label: _measurementNotificationLabel(
@@ -736,6 +744,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      unawaited(_playMeasurementFailedChime());
       await _updateMeasurementSessionNotification(
         progress: _displayedOverallProgress,
         label: _measurementNotificationLabel(
@@ -759,6 +768,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      unawaited(_playMeasurementFailedChime());
       await _updateMeasurementSessionNotification(
         progress: _displayedOverallProgress,
         label: _measurementNotificationLabel(
@@ -782,6 +792,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      unawaited(_playMeasurementFailedChime());
       await _updateMeasurementSessionNotification(
         progress: _displayedOverallProgress,
         label: _measurementNotificationLabel(
@@ -807,6 +818,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+      unawaited(_playMeasurementFailedChime());
       await _updateMeasurementSessionNotification(
         progress: _displayedOverallProgress,
         label: _measurementNotificationLabel(
@@ -856,6 +868,34 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       // Ignore on unsupported platforms.
     } on PlatformException {
       // Ignore notification failures and keep the measurement running.
+    }
+  }
+
+  Future<void> _playMeasurementCompletedChime() async {
+    if (!ref.read(measurementChimeControllerProvider)) {
+      return;
+    }
+
+    try {
+      await _measurementChimeChannel.invokeMethod<void>('playSuccess');
+    } on MissingPluginException {
+      // Ignore on unsupported platforms.
+    } on PlatformException {
+      // Ignore unsupported native chime playback.
+    }
+  }
+
+  Future<void> _playMeasurementFailedChime() async {
+    if (!ref.read(measurementChimeControllerProvider)) {
+      return;
+    }
+
+    try {
+      await _measurementChimeChannel.invokeMethod<void>('playFailure');
+    } on MissingPluginException {
+      // Ignore on unsupported platforms.
+    } on PlatformException {
+      // Ignore unsupported native chime playback.
     }
   }
 
@@ -926,8 +966,22 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
       return trimmed;
     }
 
-    final normalized = trimmed.endsWith('.') ? trimmed : '$trimmed.';
+    final sanitized = _sanitizeLocalMeasurementMessage(trimmed);
+    final normalized = sanitized.endsWith('.') ? sanitized : '$sanitized.';
     return 'Local measurement skipped: $normalized';
+  }
+
+  String _sanitizeLocalMeasurementMessage(String message) {
+    final trimmed = message.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      return AppMessages.intranetServerConnectionFailed;
+    }
+
+    if (trimmed.length > 160) {
+      return '${trimmed.substring(0, 157).trimRight()}...';
+    }
+
+    return trimmed;
   }
 
   @override
