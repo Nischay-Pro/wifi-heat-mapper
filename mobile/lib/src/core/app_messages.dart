@@ -31,6 +31,8 @@ class AppMessages {
   static const measurementUploaded = 'Measurement uploaded to the WHM server.';
   static const measurementCapturedNoServer =
       'Measurement captured locally, but no connected server URL is available for upload.';
+  static const noMeasurementRecorded =
+      'No measurement could be recorded for the selected measurement mode.';
   static const customLibrespeedUrlRequired =
       'Enter a valid http:// or https:// URL for your custom Librespeed server.';
   static const intranetServerRequired =

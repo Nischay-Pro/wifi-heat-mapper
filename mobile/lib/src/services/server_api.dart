@@ -263,7 +263,7 @@ class ServerApi {
     required DeviceIdentity device,
     required WifiMetadata wifiMetadata,
     required InternetMeasurementResult? localResult,
-    required InternetMeasurementResult internetResult,
+    required InternetMeasurementResult? internetResult,
     required DateTime measuredAt,
     required SitePoint point,
   }) async {
@@ -287,7 +287,7 @@ class ServerApi {
       'measured_at': measuredAt.toUtc().toIso8601String(),
       'wifi': wifiMetadata.toJson(),
       'local_result': localResult?.toJson(),
-      'internet_result': internetResult.toJson(),
+      'internet_result': internetResult?.toJson(),
     });
 
     final httpClient = HttpClient()

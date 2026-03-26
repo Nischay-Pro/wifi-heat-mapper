@@ -13,6 +13,7 @@ import 'package:mobile/src/core/ui/app_widgets.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_service.dart';
 import 'package:mobile/src/features/measurements/local_measurement_service.dart';
+import 'package:mobile/src/features/measurements/measurement_scope_controller.dart';
 import 'package:mobile/src/features/measurements/wifi_metadata_service.dart';
 import 'package:mobile/src/models/floor_map.dart';
 import 'package:mobile/src/models/internet_measurement_result.dart';
@@ -445,69 +446,94 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
     });
 
     try {
-      InternetMeasurementResult? localResult;
-      String? localMeasurementNotice;
-      try {
-        localResult = await ref
-            .read(localMeasurementTestProvider)
-            .recordLocalMeasurement(
-              bindAddress: _wifiMetadata.clientIp,
-              onProgress: (progress, activeStageLabel) {
-                if (!mounted) {
-                  return;
-                }
+      final measurementScope = ref.read(measurementScopeControllerProvider);
+      final shouldRunLocal = measurementScope.includesLocal;
+      final shouldRunInternet = measurementScope.includesInternet;
+      final totalWeight =
+          (shouldRunLocal ? _localMeasurementWeight : 0) +
+          (shouldRunInternet ? _internetMeasurementWeight : 0) +
+          _uploadWeight;
+      final localWeight = shouldRunLocal
+          ? _localMeasurementWeight / totalWeight
+          : 0.0;
+      final internetWeight = shouldRunInternet
+          ? _internetMeasurementWeight / totalWeight
+          : 0.0;
+      final uploadWeight = _uploadWeight / totalWeight;
 
-                setState(() {
-                  _displayedOverallProgress = max(
-                    _displayedOverallProgress,
-                    progress.clamp(0.0, 1.0) * _localMeasurementWeight,
-                  );
-                  _internetProgress = _internetProgress.mergeWith(
-                    InternetSpeedTestProgress(
-                      phase: InternetSpeedTestPhase.measuringLatency,
-                      overallProgress: _displayedOverallProgress,
-                      progress: progress.clamp(0.0, 1.0),
-                      activeStageLabel: activeStageLabel,
-                    ),
-                  );
-                });
-              },
-            );
-      } on StateError catch (error) {
-        localMeasurementNotice = _formatLocalMeasurementNotice(error.message);
-      } on SocketException catch (error) {
-        localMeasurementNotice = _formatLocalMeasurementNotice(error.message);
-      } catch (error) {
-        localMeasurementNotice = _formatLocalMeasurementNotice('$error');
+      InternetMeasurementResult? localResult;
+      InternetMeasurementResult? internetResult;
+      String? localMeasurementNotice;
+      if (shouldRunLocal) {
+        try {
+          localResult = await ref
+              .read(localMeasurementTestProvider)
+              .recordLocalMeasurement(
+                bindAddress: _wifiMetadata.clientIp,
+                onProgress: (progress, activeStageLabel) {
+                  if (!mounted) {
+                    return;
+                  }
+
+                  setState(() {
+                    _displayedOverallProgress = max(
+                      _displayedOverallProgress,
+                      progress.clamp(0.0, 1.0) * localWeight,
+                    );
+                    _internetProgress = _internetProgress.mergeWith(
+                      InternetSpeedTestProgress(
+                        phase: InternetSpeedTestPhase.measuringLatency,
+                        overallProgress: _displayedOverallProgress,
+                        progress: progress.clamp(0.0, 1.0),
+                        activeStageLabel: activeStageLabel,
+                      ),
+                    );
+                  });
+                },
+              );
+        } on StateError catch (error) {
+          localMeasurementNotice = _formatLocalMeasurementNotice(error.message);
+        } on SocketException catch (error) {
+          localMeasurementNotice = _formatLocalMeasurementNotice(error.message);
+        } catch (error) {
+          localMeasurementNotice = _formatLocalMeasurementNotice('$error');
+        }
       }
 
       if (mounted) {
         setState(() {
           _displayedOverallProgress = max(
             _displayedOverallProgress,
-            _localMeasurementWeight,
+            localWeight,
           );
         });
       }
 
-      final result = await ref
-          .read(internetSpeedTestServiceProvider)
-          .recordInternetMeasurement(
-            onProgress: (progress) {
-              if (!mounted) {
-                return;
-              }
+      if (shouldRunInternet) {
+        internetResult = await ref
+            .read(internetSpeedTestServiceProvider)
+            .recordInternetMeasurement(
+              onProgress: (progress) {
+                if (!mounted) {
+                  return;
+                }
 
-              setState(() {
-                _internetProgress = _internetProgress.mergeWith(progress);
-                _displayedOverallProgress = max(
-                  _displayedOverallProgress,
-                  _localMeasurementWeight +
-                      (progress.overallProgress * _internetMeasurementWeight),
-                );
-              });
-            },
-          );
+                setState(() {
+                  _internetProgress = _internetProgress.mergeWith(progress);
+                  _displayedOverallProgress = max(
+                    _displayedOverallProgress,
+                    localWeight + (progress.overallProgress * internetWeight),
+                  );
+                });
+              },
+            );
+      }
+
+      if (localResult == null && internetResult == null) {
+        throw StateError(
+          localMeasurementNotice ?? AppMessages.noMeasurementRecorded,
+        );
+      }
 
       if (!mounted) {
         return;
@@ -533,7 +559,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
           setState(() {
             _displayedOverallProgress = max(
               _displayedOverallProgress,
-              1 - _uploadWeight,
+              1 - uploadWeight,
             );
           });
         }
@@ -550,7 +576,7 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
               device: deviceIdentity,
               wifiMetadata: _wifiMetadata,
               localResult: localResult,
-              internetResult: result,
+              internetResult: internetResult,
               measuredAt: measuredAt,
               point: measurementPoint,
             );
@@ -646,13 +672,29 @@ class _MeasurementsPageState extends ConsumerState<MeasurementsPage>
         );
         _isRecordingMeasurement = false;
       });
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _internetMeasurementError = error.message;
+        _internetProgress = _internetProgress.mergeWith(
+          const InternetSpeedTestProgress(
+            phase: InternetSpeedTestPhase.failed,
+            overallProgress: 0,
+            progress: 0,
+          ),
+        );
+        _isRecordingMeasurement = false;
+      });
     } catch (error) {
       if (!mounted) {
         return;
       }
 
       setState(() {
-        _internetMeasurementError = 'Internet measurement failed: $error';
+        _internetMeasurementError = '$error';
         _internetProgress = _internetProgress.mergeWith(
           const InternetSpeedTestProgress(
             phase: InternetSpeedTestPhase.failed,

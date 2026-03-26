@@ -11,6 +11,7 @@ import 'package:mobile/src/features/connect/server_connect_page.dart';
 import 'package:mobile/src/features/connect/server_connection_controller.dart';
 import 'package:mobile/src/features/measurements/internet_speed_test_settings_controller.dart';
 import 'package:mobile/src/features/measurements/local_measurement_settings_controller.dart';
+import 'package:mobile/src/features/measurements/measurement_scope_controller.dart';
 import 'package:mobile/src/features/measurements/measurements_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permissions_page.dart';
 import 'package:mobile/src/features/permissions/wifi_permission_service.dart';
@@ -363,6 +364,7 @@ class _SettingsTab extends ConsumerWidget {
     final internetSettings = ref.watch(
       internetSpeedTestSettingsControllerProvider,
     );
+    final measurementScope = ref.watch(measurementScopeControllerProvider);
     final intranetSettings = ref.watch(
       localMeasurementSettingsControllerProvider,
     );
@@ -395,6 +397,17 @@ class _SettingsTab extends ConsumerWidget {
         AppSettingsGroup(
           flat: true,
           children: [
+            AppSettingsRow(
+              title: 'Mode',
+              subtitle: _measurementScopeLabel(measurementScope),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const _MeasurementModeSettingsPage(),
+                  ),
+                );
+              },
+            ),
             AppSettingsRow(
               title: 'Internet measurements',
               subtitle: internetSettings.backendLabel,
@@ -461,6 +474,14 @@ class _SettingsTab extends ConsumerWidget {
       ],
     );
   }
+}
+
+String _measurementScopeLabel(MeasurementScopePreference scope) {
+  return switch (scope) {
+    MeasurementScopePreference.internetOnly => 'Internet only',
+    MeasurementScopePreference.localOnly => 'Local only',
+    MeasurementScopePreference.internetAndLocal => 'Internet and local',
+  };
 }
 
 class _InternetSettingsPage extends ConsumerWidget {
@@ -617,6 +638,63 @@ class _InternetSettingsPage extends ConsumerWidget {
                       ),
                     );
                   },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MeasurementModeSettingsPage extends ConsumerWidget {
+  const _MeasurementModeSettingsPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokens = AppTokens.of(context);
+    final scope = ref.watch(measurementScopeControllerProvider);
+    final controller = ref.read(measurementScopeControllerProvider.notifier);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Measurement mode')),
+      body: SafeArea(
+        child: AppPage(
+          children: [
+            const AppSectionLabel(label: 'Mode'),
+            SizedBox(height: tokens.spacing.compact),
+            const AppSectionNote(
+              message:
+                  'Choose whether this device runs internet measurements, local measurements, or both.',
+            ),
+            SizedBox(height: tokens.sectionGap),
+            AppSettingsGroup(
+              flat: true,
+              children: [
+                _SelectableSettingsRow(
+                  title: 'Internet only',
+                  subtitle: 'Run only the public internet measurement backend.',
+                  isSelected: scope == MeasurementScopePreference.internetOnly,
+                  onTap: () => controller.setScope(
+                    MeasurementScopePreference.internetOnly,
+                  ),
+                ),
+                _SelectableSettingsRow(
+                  title: 'Local only',
+                  subtitle: 'Run only the local iperf3 measurement backend.',
+                  isSelected: scope == MeasurementScopePreference.localOnly,
+                  onTap: () =>
+                      controller.setScope(MeasurementScopePreference.localOnly),
+                ),
+                _SelectableSettingsRow(
+                  title: 'Internet and local',
+                  subtitle: 'Run both measurement backends for each capture.',
+                  isSelected:
+                      scope == MeasurementScopePreference.internetAndLocal,
+                  onTap: () => controller.setScope(
+                    MeasurementScopePreference.internetAndLocal,
+                  ),
                 ),
               ],
             ),

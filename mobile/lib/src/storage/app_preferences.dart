@@ -41,6 +41,34 @@ enum InternetSpeedTestBackendPreference {
   }
 }
 
+enum MeasurementScopePreference {
+  internetOnly('internet_only'),
+  localOnly('local_only'),
+  internetAndLocal('internet_and_local');
+
+  const MeasurementScopePreference(this.storageValue);
+
+  final String storageValue;
+
+  bool get includesInternet =>
+      this == MeasurementScopePreference.internetOnly ||
+      this == MeasurementScopePreference.internetAndLocal;
+
+  bool get includesLocal =>
+      this == MeasurementScopePreference.localOnly ||
+      this == MeasurementScopePreference.internetAndLocal;
+
+  static MeasurementScopePreference fromStorage(String? value) {
+    for (final preference in values) {
+      if (preference.storageValue == value) {
+        return preference;
+      }
+    }
+
+    return MeasurementScopePreference.internetAndLocal;
+  }
+}
+
 class AppPreferences {
   AppPreferences(this._preferences);
 
@@ -49,6 +77,7 @@ class AppPreferences {
   static const deviceSlugKey = 'device_slug';
   static const themePreferenceKey = 'theme_preference';
   static const internetSpeedTestBackendKey = 'internet_speed_test_backend';
+  static const measurementScopeKey = 'measurement_scope';
   static const customLibrespeedUrlKey = 'custom_librespeed_url';
   static const iperfServerHostKey = 'iperf_server_host';
   static const iperfServerPortKey = 'iperf_server_port';
@@ -82,6 +111,11 @@ class AppPreferences {
   InternetSpeedTestBackendPreference getInternetSpeedTestBackendPreference() =>
       InternetSpeedTestBackendPreference.fromStorage(
         _preferences.getString(internetSpeedTestBackendKey),
+      );
+
+  MeasurementScopePreference getMeasurementScopePreference() =>
+      MeasurementScopePreference.fromStorage(
+        _preferences.getString(measurementScopeKey),
       );
 
   String? getCustomLibrespeedUrl() =>
@@ -137,6 +171,10 @@ class AppPreferences {
   Future<bool> setInternetSpeedTestBackendPreference(
     InternetSpeedTestBackendPreference value,
   ) => _preferences.setString(internetSpeedTestBackendKey, value.storageValue);
+
+  Future<bool> setMeasurementScopePreference(
+    MeasurementScopePreference value,
+  ) => _preferences.setString(measurementScopeKey, value.storageValue);
 
   Future<bool> setCustomLibrespeedUrl(String value) =>
       _preferences.setString(customLibrespeedUrlKey, value);
