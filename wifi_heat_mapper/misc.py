@@ -149,6 +149,63 @@ def verify_interface(target_interface):
         exit(1)
 
 
+def process_airport(target_interface):
+    results = {}
+
+    ifconfig_info = get_application_output(["ifconfig {0}".format(target_interface)], shell=True, timeout=10).replace(
+        "\t", " "
+    )
+    results["interface"] = re.findall(r"^([a-z]+\d+):", ifconfig_info)[0]
+    results["interface_mac"] = re.findall(r"(?<=ether )(.*)", ifconfig_info)[0].strip()
+
+    if not verify_mac(results["interface_mac"]):
+        print("The interface {0} has an invalid MAC address".format(target_interface))
+        exit(1)
+    results["channel_frequency"] = None
+
+    # == Output of ifconfig en0 on macos
+    # en0: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+    #     options=6463<RXCSUM,TXCSUM,TSO4,TSO6,CHANNEL_IO,PARTIAL_CSUM,ZEROINVERT_CSUM>
+    #     ether 9c:3e:53:6a:fb:19
+    #     inet6 fe80::141e:db83:d789:f91a%en0 prefixlen 64 secured scopeid 0xb
+    #     inet 192.168.1.1 netmask 0xffffff00 broadcast 192.168.1.255
+    #     nd6 options=201<PERFORMNUD,DAD>
+    #     media: autoselect
+    #     status: active
+    results["ip"] = re.findall(r"(?<=inet )(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", ifconfig_info)[0]
+
+    airport_info = get_application_output(
+        ["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I"],
+        shell=True,
+        timeout=10,
+    ).replace("\t", " ")
+    results["channel"] = int(re.findall(r"(?<=channel: )(\d*)(?:\,)?", airport_info)[0])
+    results["ssid"] = re.findall(r"(?<= SSID: )(.*)", airport_info)[0]
+    results["ssid_mac"] = None
+    results["signal_strength"] = int(re.findall(r"(?<=agrCtlRSSI: )(-?\d*)", airport_info)[0])
+
+    # == Output of airport -I on macos
+    #         agrCtlRSSI: -53
+    #     agrExtRSSI: 0
+    #     agrCtlNoise: -90
+    #     agrExtNoise: 0
+    #         state: running
+    #         op mode: station
+    #     lastTxRate: 1200
+    #         maxRate: 867
+    # lastAssocStatus: 0
+    #     802.11 auth: open
+    #     link auth: wpa2-psk
+    #         BSSID:
+    #         SSID: <REDACTED>
+    #             MCS: 11
+    # guardInterval: 800
+    #             NSS: 2
+    #         channel: 116,80
+
+    return results
+
+
 def process_iw(target_interface):
     """Get metrics from a wireless interface.
 
